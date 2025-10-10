@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "sotugiyo_git",
   "version": "1.0.0",
   "description": "",
@@ -15,5 +16,9 @@
   "bugs": {
     "url": "https://github.com/k024c2071-lee/sotugiyo_git/issues"
   },
-  "homepage": "https://github.com/k024c2071-lee/sotugiyo_git#readme"
+  "homepage": "https://github.com/k024c2071-lee/sotugiyo_git#readme",
+  "dependencies": {
+    "@azure/cosmos": "^4.6.0",
+    "dotenv": "^17.2.3"
+  }
 }
