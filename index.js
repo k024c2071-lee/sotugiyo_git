@@ -6,8 +6,8 @@ const endpoint = process.env.COSMOS_ENDPOINT;
 const key = process.env.COSMOS_KEY; 
 const dbclient = new CosmosClient({ endpoint, key });
 
-const { database } = await dbclient.databases.createIfNotExists({ id: "Test Database" });
-const { container } = await database.containers.createIfNotExists({ id: "Test Container" });
+const { database } = await dbclient.databases.createIfNotExists({ id: "charts" });
+const { container } = await database.containers.createIfNotExists({ id: "charts" });
 
 // const cities = [
 //   { id: "1", name: "Olympia", state: "WA", isCapitol: true },
@@ -18,11 +18,10 @@ const { container } = await database.containers.createIfNotExists({ id: "Test Co
 //   await container.items.create(city);
 // }
 const { resources } = await container.items
-  .query("SELECT * from c WHERE c.isCapitol = true")
+  .query("SELECT * from c")
   .fetchAll();
 
 console.log("-----------------------------------------");
-console.log("結果 (isCapitol = true):");
 console.log(resources);
 console.log(`\n全部 ${resources.length}個の検索結果が出ました`);
 console.log("-----------------------------------------");
