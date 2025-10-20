@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>login</title>
+    <link href="style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="form-container">
+        <h2>login</h2>
+        <!-- 로그인 처리를 위한 /login 경로 (서버에 구현 필요) -->
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label for="email">email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">login</button>
+        </form>
+        <p class="register-link">
+            アカウントを持っていますか? <a href="/register.html">会員登録</a>
+        </p>
+    </div>
+</body>
+</html>

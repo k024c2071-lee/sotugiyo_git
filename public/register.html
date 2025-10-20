@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>register</title>
+    <link href="style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="form-container">
+        <h2>会員登録</h2>
+        <!-- 서버의 /register 경로로 POST 요청을 보냅니다. -->
+        <form action="/register" method="POST">
+            <div class="form-group">
+                <label for="email">e-mail</label>
+                <!-- name 속성은 서버의 req.body에서 사용하는 키와 일치해야 합니다. -->
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label for="username">name</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="location">住所</label>
+                <input type="text" id="location" name="location" required>
+            </div>
+            <button type="submit">登録</button>
+        </form>
+        <p class="login-link">
+            アカウントがすでにありますでしょうか？ <a href="/login.html">login</a>
+        </p>
+    </div>
+</body>
+</html>

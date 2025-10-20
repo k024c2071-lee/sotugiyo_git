@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { CosmosClient } = require('@azure/cosmos');
+const session = require('express-session');
 require('dotenv').config();
 
 
@@ -10,6 +11,8 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(express.static('public'));
 // app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 
 
@@ -18,9 +21,11 @@ app.use(express.static('public'));
 // Cosmos DB 클라이언트 설정
 const endpoint = process.env.COSMOS_ENDPOINT;
 const key = process.env.COSMOS_KEY; 
+const secret=process.env.SECRET_KEY;
 const client = new CosmosClient({ endpoint, key });
 const usersdatabase = client.database("users");
 const usersContainer = usersdatabase.container("users");
+
 
 app.post('/register', async (req, res) => {
     const { email, password, username, location } = req.body;
@@ -37,7 +42,7 @@ app.post('/register', async (req, res) => {
 
     try {
         await usersContainer.items.create(newUser);
-        res.redirect('/login'); // 회원가입 성공 시 로그인 페이지로 이동
+        res.redirect('./login.html'); // 회원가입 성공 시 로그인 페이지로 이동
     } catch (error) {
         console.error("登録エラー：", error);
         res.status(500).send("失敗しました。");
@@ -46,6 +51,95 @@ app.post('/register', async (req, res) => {
 
 
 
+
+
+// --- 세션 미들웨어 설정 ---
+//　session設定
+// 이 코드는 모든 라우트(app.post, app.get 등)보다 먼저 위치해야 합니다.
+app.use(session({
+  // 세션 ID 쿠키를 서명하는 데 사용되는 비밀 키입니다.
+  // 실제 프로덕션 환경에서는 .env 파일에 저장하고 더 복잡한 문자열을 사용해야 합니다.
+  // 秘密鍵
+  secret, 
+  
+  // 세션 데이터가 변경되지 않았더라도 세션을 다시 저장할지 여부를 결정합니다.
+  resave: false, 
+  
+  // 초기화되지 않은 (새롭지만 수정되지 않은) 세션을 저장할지 여부를 결정합니다.
+  saveUninitialized: true, 
+  
+  cookie: { 
+    secure: false, // 개발 중에는 http를 허용하기 위해 false로 설정합니다. 프로덕션에서는 true로 설정하세요.
+    maxAge: 1000 * 60 * 60 // 쿠키 유효 기간 (예: 1시간)
+  }
+  // 참고: 기본 설정은 메모리 저장소입니다. 서버가 재시작되면 세션이 모두 사라집니다.
+  // 프로덕션에서는 connect-mongo, connect-redis 등 데이터베이스 기반 세션 저장소를 사용하는 것이 좋습니다.
+}));
+
+
+// --- 수정된 로그인 라우트 ---
+app.post('/login', async (req, res) => {
+  try {
+    // 1. 사용자가 폼에 입력한 이메일과 비밀번호를 가져옵니다.
+    const { email, password } = req.body;
+
+    // 2. 데이터베이스에서 해당 이메일을 가진 사용자를 찾습니다.
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.email = @email",
+      parameters: [
+        { name: "@email", value: email }
+      ]
+    };
+
+    const { resources: users } = await usersContainer.items.query(querySpec).fetchAll();
+
+    // 3. 사용자가 존재하지 않는 경우
+    if (users.length === 0) {
+      return res.status(404).send("会員を見つけません");
+    }
+
+    const user = users[0];
+
+    // 4. 입력된 비밀번호와 데이터베이스의 암호화된 비밀번호를 비교합니다.
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+
+    if (isPasswordMatch) {
+      // 5. 비밀번호가 일치하는 경우 (로그인 성공)
+      // 사용자 정보를 세션 객체에 저장합니다.
+      // 이 정보는 사용자가 로그아웃하거나 세션이 만료될 때까지 서버에 유지됩니다.
+      req.session.user = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        location: user.location
+      };
+      
+      // 세션 저장이 완료된 후 리디렉션합니다.
+      req.session.save(() => {
+        res.redirect('/index.html'); // 로그인 후 이동할 페이지
+      });
+      
+    } else {
+      // 6. 비밀번호가 일치하지 않는 경우
+      res.status(401).send("パスワードが間違っています");
+    }
+
+  } catch (error) {
+    console.error("エラー発生", error);
+    res.status(500).send("サーバーの問題でログインできません");
+  }
+});
+
+// --- 로그아웃 라우트 ---
+app.get('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).send('ログアウトに失敗しました。');
+    }
+    // 세션 삭제 후 로그인 페이지로 리디렉션
+    res.redirect('/login.html');
+  });
+});
 
 
 
@@ -101,15 +195,14 @@ async function sendInvitationEmail(toEmail, roomId) {
     let mailOptions = {
         from: 'YOUR_EMAIL@gmail.com',
         to: toEmail,
-        subject: '새로운 채팅방에 초대되셨습니다!',
-        html: `<p>안녕하세요!</p>
-               <p>새로운 채팅방에 초대되셨습니다. 아래 링크를 클릭하여 참여하세요.</p>
-               <a href="http://your-website.com/chat/${roomId}">채팅방 참여하기</a>`
+        subject: '新しいチャットルームへの招待',
+        html: `<p>おはようございます!</p>
+               <p>新しいチャットルームへの招待、下のリンクを押してください</p>
+               <a href="http://your-website.com/chat/${roomId}">チャートルーム参加</a>`
     };
 
     await transporter.sendMail(mailOptions);
 }
-
 
 
 
@@ -125,7 +218,7 @@ const chartsdatabase = client.database("charts");
 const chatsContainer = chartsdatabase.container("charts");
 
 io.on('connection', (socket) => {
-    console.log('a user connected');
+    console.log('user connected');
 
     socket.on('join room', (roomId) => {
         socket.join(roomId);
@@ -162,5 +255,5 @@ server.listen(PORT, () => {
 app.post('/invite-to-room', (req, res) => {
     const { email, roomId } = req.body;
     sendInvitationEmail(email, roomId);
-    res.status(200).send("초대 메일을 발송했습니다.");
+    res.status(200).send("招待メールを送信しました。");
 });
