@@ -1,0 +1,100 @@
+/* ==========================
+   index.html専用デザイン
+========================== */
+
+body {
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+  background: linear-gradient(135deg, #e0f2ff 0%, #ffffff 100%);
+  color: #222;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+header {
+  margin-bottom: 2.5em;
+}
+
+.logo {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #2563eb;
+  margin-bottom: 0.3em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.logo span {
+  color: #0ea5e9;
+}
+
+h1 {
+  font-size: 2.2rem;
+  letter-spacing: 2px;
+  color: #2563eb;
+  margin-bottom: 0.5em;
+}
+
+.catch {
+  font-size: 1.2rem;
+  margin-bottom:  1%;
+  color: #555;
+  line-height: 1.8;
+}
+
+.btn-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+a.btn {
+  display: inline-block;
+  padding: 1.2em 3em;           /* ←大きくしたポイント① */
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.1rem;            /* ←大きくしたポイント② */
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); /* ←少し立体感 */
+}
+
+a.btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+a.btn.primary:hover {
+  background: #1e40af;
+}
+
+a.btn.secondary {
+  background: #0ea5e9;
+  color: #fff;
+}
+
+a.btn.secondary:hover {
+  background: #0284c7;
+}
+
+footer {
+  position: absolute;
+  bottom: 10px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* スマホ対応 */
+@media (max-width: 600px) {
+  a.btn {
+    width: 80%;
+    padding: 1.1em 0;
+    font-size: 1.05rem;
+  }
+}
