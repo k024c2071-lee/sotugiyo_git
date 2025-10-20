@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>新規登録 | CHATRA</title>
+
+  <!-- 共通CSS -->
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/layout.css" />
+
+  <!-- signup専用CSS -->
+  <link rel="stylesheet" href="../assets/css/pages/signup.css" />
+</head>
+<body class="auth-body">
+
+  <main class="auth-container">
+    <a href="../index.html" class="back-link">← トップへ戻る</a>
+
+    <div class="auth-card">
+      <h1 class="auth-title">新規登録</h1>
+      <p class="auth-lead">CHAT ＋ TRAVEL の世界に参加しよう。</p>
+
+      <form class="auth-form" autocomplete="on">
+        <label class="field">
+          <span>表示名（ニックネーム）</span>
+          <input type="text" name="displayName" placeholder="たび太郎" required />
+        </label>
+
+        <label class="field">
+          <span>メールアドレス</span>
+          <input type="email" name="email" placeholder="you@example.com" required />
+        </label>
+
+        <label class="field">
+          <span>パスワード</span>
+          <div class="password-wrap">
+            <input type="password" name="password" placeholder="" required />
+            <button type="button" class="pw-toggle">表示</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>パスワード（確認）</span>
+          <div class="password-wrap">
+            <input type="password" name="password2" placeholder="もう一度入力" required />
+            <button type="button" class="pw-toggle">表示</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>あなたの住所</span>
+          <input type="text" name="region" placeholder="例：東京都大田区西蒲田５丁目２３−２２" />
+        </label>
+
+        <label class="check">
+          <input type="checkbox" />
+          <span>利用規約に同意します</span>
+        </label>
+
+        <button type="button" class="btn primary">登録してはじめる</button>
+
+        <p class="auth-sub">
+          すでにアカウントがありますか？
+          <a href="./login.html">ログインはこちら</a>
+        </p>
+      </form>
+    </div>
+  </main>
+
+</body>
+</html>

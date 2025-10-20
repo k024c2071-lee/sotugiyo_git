@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ログイン | CHATRA</title>
+
+  <!-- 共通CSS -->
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/layout.css" />
+
+  <!-- 認証ページ用CSS -->
+  <link rel="stylesheet" href="../assets/css/pages/login.css" />
+</head>
+<body class="auth-body">
+
+  <main class="auth-container">
+    <a href="../index.html" class="back-link">← トップへ戻る</a>
+
+    <div class="auth-card">
+      <h1 class="auth-title">ログイン</h1>
+      <p class="auth-lead">CHAT ＋ TRAVEL の世界へようこそ。</p>
+
+      <form class="auth-form" autocomplete="on">
+        <label class="field">
+          <span>メールアドレス</span>
+          <input type="email" name="email" placeholder="you@example.com" required />
+        </label>
+
+        <label class="field">
+          <span>パスワード</span>
+          <div class="password-wrap">
+            <input type="password" name="password" placeholder="" required />
+            <button type="button" class="pw-toggle" aria-label="パスワード表示切替">表示</button>
+          </div>
+        </label>
+
+        <label class="check">
+          <input type="checkbox" />
+          <span>ログイン状態を保持する</span>
+        </label>
+
+        <button type="button" class="btn primary">ログイン</button>
+
+        <p class="auth-sub">
+          アカウントをお持ちでないですか？
+          <a href="./signup.html">新規登録はこちら</a>
+        </p>
+      </form>
+    </div>
+  </main>
+
+</body>
+</html>
