@@ -21,16 +21,16 @@
       <h1 class="auth-title">ログイン</h1>
       <p class="auth-lead">CHAT ＋ TRAVEL の世界へようこそ。</p>
 
-      <form class="auth-form" autocomplete="on">
+      <form action="/login" method="POST" class="auth-form" autocomplete="on">
         <label class="field">
           <span>メールアドレス</span>
-          <input type="email" name="email" placeholder="you@example.com" required />
+          <input type="email"  id="email" name="email" placeholder="you@example.com" required />
         </label>
 
         <label class="field">
           <span>パスワード</span>
           <div class="password-wrap">
-            <input type="password" name="password" placeholder="" required />
+            <input type="password" id="password" name="password" placeholder="" required />
             <button type="button" class="pw-toggle" aria-label="パスワード表示切替">表示</button>
           </div>
         </label>
@@ -40,7 +40,7 @@
           <span>ログイン状態を保持する</span>
         </label>
 
-        <button type="button" class="btn primary">ログイン</button>
+        <button type="submit" class="btn primary">ログイン</button>
 
         <p class="auth-sub">
           アカウントをお持ちでないですか？

@@ -5,7 +5,6 @@ const session = require('express-session');
 require('dotenv').config();
 
 
-
 const PORT = process.env.PORT || 3000;
 
 const app = express();
@@ -13,6 +12,7 @@ app.use(express.static('public'));
 // app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 
 
@@ -42,7 +42,7 @@ app.post('/register', async (req, res) => {
 
     try {
         await usersContainer.items.create(newUser);
-        res.redirect('./login.html'); // 회원가입 성공 시 로그인 페이지로 이동
+        res.redirect('./pages/login.html'); // 회원가입 성공 시 로그인 페이지로 이동
     } catch (error) {
         console.error("登録エラー：", error);
         res.status(500).send("失敗しました。");
@@ -56,7 +56,9 @@ app.post('/register', async (req, res) => {
 // --- 세션 미들웨어 설정 ---
 //　session設定
 // 이 코드는 모든 라우트(app.post, app.get 등)보다 먼저 위치해야 합니다.
-app.use(session({
+
+
+const sessionMiddleware = session({
   // 세션 ID 쿠키를 서명하는 데 사용되는 비밀 키입니다.
   // 실제 프로덕션 환경에서는 .env 파일에 저장하고 더 복잡한 문자열을 사용해야 합니다.
   // 秘密鍵
@@ -74,8 +76,8 @@ app.use(session({
   }
   // 참고: 기본 설정은 메모리 저장소입니다. 서버가 재시작되면 세션이 모두 사라집니다.
   // 프로덕션에서는 connect-mongo, connect-redis 등 데이터베이스 기반 세션 저장소를 사용하는 것이 좋습니다.
-}));
-
+})
+app.use(sessionMiddleware);
 
 // --- 수정된 로그인 라우트 ---
 app.post('/login', async (req, res) => {
@@ -217,16 +219,31 @@ const io = new Server(server);
 const chartsdatabase = client.database("charts");
 const chatsContainer = chartsdatabase.container("charts");
 
+const wrap = middleware => (socket, next) => middleware(socket.request, {}, next);
+io.use(wrap(sessionMiddleware));
+
 io.on('connection', (socket) => {
-    console.log('user connected');
+    const session = socket.request.session;
+    const username = session.user.username;
+    const userLocation = session.user.location; // 필요시 위치 정보도 사용 가능
+
+    if (!session.user) {
+        console.log('未認証のユーザーが接続を試みました。');
+        socket.disconnect(true); // 강제 연결 종료
+        return;
+    }
+    console.log(`${username} 様がつながりました.`);
 
     socket.on('join room', (roomId) => {
-        socket.join(roomId);
-        console.log(`User joined room: ${roomId}`);
+      // const { roomId, sender} = data; // 클라이언트가 보낸 data 객체에서 roomId와 userInfo를 추출
+      socket.join(roomId);
+      // socket.username = sender; // userInfo 객체 안의 sender를 사용
+      console.log(`${username} joined ${roomId} room`);
     });
 
     socket.on('chat message', async (data) => {
-        const { roomId, sender, message } = data;
+        const { roomId, message } = data;
+        const sender = username;
 
         const chatMessage = {
             roomId,
@@ -243,7 +260,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('user disconnected');
+       console.log(`user disconnected`); 
     });
 });
 

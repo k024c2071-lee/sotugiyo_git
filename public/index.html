@@ -25,7 +25,6 @@
         if (input.value) {
         socket.emit('chat message', {
             roomId: roomId,
-            sender: 'CURRENT_USER_NAME', // 실제 사용자 이름으로 대체 필요
             message: input.value
         });
         input.value = '';
