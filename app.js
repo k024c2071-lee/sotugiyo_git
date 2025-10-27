@@ -2,6 +2,8 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const { CosmosClient } = require('@azure/cosmos');
 const session = require('express-session');
+const nodemailer = require('nodemailer');
+const path = require('path');
 require('dotenv').config();
 
 
@@ -116,9 +118,13 @@ app.post('/login', async (req, res) => {
         location: user.location
       };
       
+
+      const redirectUrl = req.session.redirectTo || '/index.html';
+      delete req.session.redirectTo;
+
       // 세션 저장이 완료된 후 리디렉션합니다.
       req.session.save(() => {
-        res.redirect('/index.html'); // 로그인 후 이동할 페이지
+        res.redirect(redirectUrl); // 로그인 후 이동할 페이지
       });
       
     } else {
@@ -131,6 +137,29 @@ app.post('/login', async (req, res) => {
     res.status(500).send("サーバーの問題でログインできません");
   }
 });
+
+
+//리다이렉트
+app.get('/chat/:roomId', (req, res) => {
+    // 1. 세션에 사용자 정보가 있는지 확인 (로그인 여부)
+    if (!req.session.user) {
+        // 2. 로그인이 안 되어 있다면:
+        //    사용자가 원래 가려던 주소(예: '/chat/room_12345')를 세션에 저장합니다.
+        req.session.redirectTo = req.originalUrl;
+        
+        // 3. 로그인 페이지로 강제 리디렉션합니다.
+        res.redirect('/pages/login.html');
+    } else {
+        // 4. 로그인이 되어 있다면:
+        //    채팅방 HTML 파일을 전송합니다. 
+        //    (파일 경로는 본인 프로젝트에 맞게 수정하세요. 
+        //     채팅 스크립트가 index.html에 있다면 index.html로 설정)
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+});
+
+
+
 
 // --- 로그아웃 라우트 ---
 app.get('/logout', (req, res) => {
@@ -181,29 +210,34 @@ app.post('/create-room', async (req, res) => {
 
 
 
-
-
-const nodemailer = require('nodemailer');
-
-async function sendInvitationEmail(toEmail, roomId) {
+async function sendInvitationEmail(toEmail, roomId, senderName) { // 3. 발신자 이름을 받도록 수정
     let transporter = nodemailer.createTransport({
-        service: 'gmail', // 혹은 다른 이메일 서비스
+        service: 'gmail',
         auth: {
-            user: 'YOUR_EMAIL@gmail.com',
-            pass: 'YOUR_EMAIL_PASSWORD'
+            user: process.env.EMAIL_USER || 'YOUR_EMAIL@gmail.com', // 환경 변수 사용 권장
+            pass: process.env.EMAIL_PASS || 'YOUR_EMAIL_PASSWORD' // !! 앱 비밀번호 사용 !!
         }
     });
 
+    // 4. 발신자 이름을 메일에 포함
+    const fromName = senderName || 'チャート友達'; // 발신자 이름 기본값
+
     let mailOptions = {
-        from: 'YOUR_EMAIL@gmail.com',
+        from: `"${fromName} 様" <${process.env.EMAIL_USER || 'YOUR_EMAIL@gmail.com'}>`, // "발신자 이름" <이메일> 형식
         to: toEmail,
         subject: '新しいチャットルームへの招待',
         html: `<p>おはようございます!</p>
-               <p>新しいチャットルームへの招待、下のリンクを押してください</p>
-               <a href="http://your-website.com/chat/${roomId}">チャートルーム参加</a>`
+               <p>${fromName}様から新しいメールが届きました.</p>
+               <p>下のリンクを押してください:</p>
+               <a href="http://localhost:${PORT}/chat/${roomId}">チャート参加</a>`
     };
 
-    await transporter.sendMail(mailOptions);
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`[success] to ${toEmail} (sender: ${senderName})`);
+    } catch (error) {
+        console.error(`[fail] to ${toEmail} :`, error);
+    }
 }
 
 
@@ -259,6 +293,19 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('chat message', chatMessage);
     });
 
+    socket.on('invite user', async (data) => {
+        // data 객체에는 { recipientEmail: '...', roomId: '...' }가 들어 있습니다.
+        
+        console.log(`[초대 요청]
+          sender: ${username}
+          receiver: ${data.recipientEmail}
+          chatroom: ${data.roomId}`);
+
+        // 3. 이메일 발송 함수 호출 (발신자 이름 전달)
+        await sendInvitationEmail(data.recipientEmail, data.roomId, username);
+    });
+
+
     socket.on('disconnect', () => {
        console.log(`user disconnected`); 
     });
@@ -269,8 +316,8 @@ server.listen(PORT, () => {
 });
 
 
-app.post('/invite-to-room', (req, res) => {
-    const { email, roomId } = req.body;
-    sendInvitationEmail(email, roomId);
-    res.status(200).send("招待メールを送信しました。");
-});
+// app.post('/invite-to-room', (req, res) => {
+//     const { email, roomId } = req.body;
+//     sendInvitationEmail(email, roomId);
+//     res.status(200).send("招待メールを送信しました。");
+// });
