@@ -119,7 +119,7 @@ app.post('/login', async (req, res) => {
       };
       
 
-      const redirectUrl = req.session.redirectTo || '/index.html';
+      const redirectUrl = req.session.redirectTo || './pages/menu.html';
       delete req.session.redirectTo;
 
       // 세션 저장이 완료된 후 리디렉션합니다.
@@ -176,33 +176,33 @@ app.get('/logout', (req, res) => {
 
 
 app.post('/create-room', async (req, res) => {
-    const userLocation = req.user.location; // 현재 로그인한 사용자 정보에서 위치 가져오기 (Passport.js 연동 필요)
-    const currentUserId = req.user.id;
+    // const userLocation = req.user.location; // 현재 로그인한 사용자 정보에서 위치 가져오기 (Passport.js 연동 필요)
+    // const currentUserId = req.user.id;
 
-    // 1. 같은 지역 사용자 검색
-    const querySpec = {
-        query: "SELECT * FROM c WHERE c.location = @location AND c.id != @currentUserId",
-        parameters: [
-            { name: "@location", value: userLocation },
-            { name: "@currentUserId", value: currentUserId }
-        ]
-    };
-    const { resources: usersInLocation } = await usersContainer.items.query(querySpec).fetchAll();
+    // // 1. 같은 지역 사용자 검색
+    // const querySpec = {
+    //     query: "SELECT * FROM c WHERE c.location = @location AND c.id != @currentUserId",
+    //     parameters: [
+    //         { name: "@location", value: userLocation },
+    //         { name: "@currentUserId", value: currentUserId }
+    //     ]
+    // };
+    // const { resources: usersInLocation } = await usersContainer.items.query(querySpec).fetchAll();
 
-    // 2. 랜덤 사용자 선택 (예: 최대 3명)
-    const shuffledUsers = usersInLocation.sort(() => 0.5 - Math.random());
-    const invitedUsers = shuffledUsers.slice(0, 3);
-    invitedUsers.push(req.user); // 채팅방 생성자도 추가
+    // // 2. 랜덤 사용자 선택 (예: 최대 3명)
+    // const shuffledUsers = usersInLocation.sort(() => 0.5 - Math.random());
+    // const invitedUsers = shuffledUsers.slice(0, 3);
+    // invitedUsers.push(req.user); // 채팅방 생성자도 추가
 
     // 3. 채팅방 ID 생성
     const roomId = `room_${new Date().getTime()}`;
 
-    // 4. 이메일 초대 발송
-    invitedUsers.forEach(user => {
-        if (user.id !== currentUserId) {
-            sendInvitationEmail(user.email, roomId);
-        }
-    });
+    // // 4. 이메일 초대 발송
+    // invitedUsers.forEach(user => {
+    //     if (user.id !== currentUserId) {
+    //         sendInvitationEmail(user.email, roomId);
+    //     }
+    // });
 
     res.redirect(`/chat/${roomId}`); // 생성된 채팅방으로 이동
 });
