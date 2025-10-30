@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>CHATRA Map：日本限定＋ピン→ルーム作成フォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+
+  <!-- CSS はあなたの指定の場所 -->
+  <link rel="stylesheet" href="/public/assets/css/pages/map.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- 右上ハンバーガー -->
+  <button class="hamburger" id="menuBtn" aria-label="メニュー">
+    <span class="hamburger-lines"><span></span><span></span><span></span></span>
+  </button>
+
+  <!-- 右サイドパネル（メニュー） -->
+  <aside class="side-panel" id="sidePanel">
+    <div class="side-header">
+      <div class="side-title">CHATRA メニュー</div>
+      <button class="side-close" id="sideCloseBtn">✕</button>
+    </div>
+
+    <nav class="side-nav">
+      <button class="side-item" data-view="search">🔍 ルーム検索</button>
+      <button class="side-item" data-view="list">📋 ルーム一覧</button>
+    </nav>
+
+    <div class="side-content">
+      <!-- 検索ビュー -->
+      <div class="panel-view" id="view-search">
+        <label class="side-label" for="searchInput">ルーム名で検索</label>
+        <input id="searchInput" type="text" class="side-input" placeholder="例：東京 / 札幌 / 温泉 / 友達募集" />
+        <button id="searchBtn" class="side-search-btn">検索</button>
+        <div id="searchResult" class="side-result muted">検索結果はここに出ます（今はダミー）</div>
+      </div>
+
+      <!-- 一覧ビュー -->
+      <div class="panel-view" id="view-list" style="display:none;">
+        <div class="muted" style="margin-bottom:8px;">ルームを選択するとチャット画面に切り替わります。</div>
+        <ul class="room-list" id="roomList"></ul>
+      </div>
+
+      <!-- チャットビュー -->
+      <div class="panel-view" id="view-chat" style="display:none;">
+        <div class="chat-header">
+          <div class="chat-room-name" id="chatRoomName">ルーム名</div>
+          <button class="chat-back" id="chatBackBtn">← 一覧へ</button>
+        </div>
+        <div class="chat-body" id="chatBody">
+          <div class="chat-msg chat-msg-other">いらっしゃい！ここで観光情報共有してね</div>
+          <div class="chat-msg chat-msg-me">了解です！</div>
+        </div>
+        <form class="chat-input-area" id="chatForm">
+          <input type="text" id="chatInput" class="chat-input" placeholder="メッセージを入力..." autocomplete="off" />
+          <button type="submit" class="chat-send">送信</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ルーム作成モーダル -->
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="modal" id="roomModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">チャットルームを作成</div>
+        <button class="icon-btn" id="closeModal" aria-label="閉じる">✕</button>
+      </div>
+
+      <form id="roomForm" class="form-grid">
+        <input type="hidden" id="roomLng" name="lng" />
+        <input type="hidden" id="roomLat" name="lat" />
+
+        <div class="row">
+          <label for="roomName">ルーム名 <span class="muted">（必須）</span></label>
+          <input type="text" id="roomName" name="name" placeholder="例：与那国島 夕日スポット" required />
+        </div>
+
+        <div class="row">
+          <label for="roomDesc">概要</label>
+          <textarea id="roomDesc" name="description" placeholder="どんなルームか、簡単に説明してください。"></textarea>
+        </div>
+
+        <div class="row">
+          <div class="row-inline">
+            <input type="checkbox" id="roomPublic" name="isPublic" checked />
+            <label for="roomPublic" style="margin:0;">チャットを公開する</label>
+          </div>
+          <div class="muted">※非公開にすると、参加にはパスワードが必要です。</div>
+        </div>
+
+        <div class="row" id="pwRow" style="display:none;">
+          <label for="roomPassword">パスワード <span class="muted">（非公開時は必須）</span></label>
+          <input type="password" id="roomPassword" name="password" placeholder="8文字以上推奨" />
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-secondary" id="cancelBtn">キャンセル</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">作成する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ✅ JS は外出し -->
+  <script src="/public/assets/js/map.js"></script>
+</body>
+</html>
