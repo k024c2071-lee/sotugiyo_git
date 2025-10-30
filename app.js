@@ -108,11 +108,11 @@ async function getCoordsFromPostalCodeOSM(postalCode, countryCode = 'JP') {
             console.log(`[Nominatim] result: ${postalCode} -> lat=${latitude}, lon=${longitude}`);
             return { latitude, longitude };
         } else {
-            console.warn(`[Nominatim] 우편번호 ${postalCode}에 대한 좌표를 찾을 수 없습니다.`);
+            console.warn(`[Nominatim] 郵便番号 ${postalCode}に対するの結果が見つかりません。`);
             return null; // 결과 없음
         }
     } catch (error) {
-        console.error("[Nominatim] API 호출 중 오류 발생:", error);
+        console.error("[Nominatim] API エラー発生:", error);
         throw error; // 에러를 다시 던져서 상위에서 처리하도록 함
     }
 }
@@ -240,37 +240,120 @@ app.get('/logout', (req, res) => {
 
 
 
+// app.post('/create-room', async (req, res) => {
+//     // const userLocation = req.user.location; // 현재 로그인한 사용자 정보에서 위치 가져오기 (Passport.js 연동 필요)
+//     // const currentUserId = req.user.id;
+
+//     // // 1. 같은 지역 사용자 검색
+//     // const querySpec = {
+//     //     query: "SELECT * FROM c WHERE c.location = @location AND c.id != @currentUserId",
+//     //     parameters: [
+//     //         { name: "@location", value: userLocation },
+//     //         { name: "@currentUserId", value: currentUserId }
+//     //     ]
+//     // };
+//     // const { resources: usersInLocation } = await usersContainer.items.query(querySpec).fetchAll();
+
+//     // // 2. 랜덤 사용자 선택 (예: 최대 3명)
+//     // const shuffledUsers = usersInLocation.sort(() => 0.5 - Math.random());
+//     // const invitedUsers = shuffledUsers.slice(0, 3);
+//     // invitedUsers.push(req.user); // 채팅방 생성자도 추가
+
+//     // 3. 채팅방 ID 생성
+//     const roomId = `room_${new Date().getTime()}`;
+
+//     // // 4. 이메일 초대 발송
+//     // invitedUsers.forEach(user => {
+//     //     if (user.id !== currentUserId) {
+//     //         sendInvitationEmail(user.email, roomId);
+//     //     }
+//     // });
+
+//     res.redirect(`/chat/${roomId}`); // 생성된 채팅방으로 이동
+// });
+
+
+const MAX_INVITEES = 10;
+
 app.post('/create-room', async (req, res) => {
-    // const userLocation = req.user.location; // 현재 로그인한 사용자 정보에서 위치 가져오기 (Passport.js 연동 필요)
-    // const currentUserId = req.user.id;
+    // 1. 로그인 확인
+    if (!req.session.user || !req.session.user.id || !req.session.user.email) {
+        return res.status(401).redirect('/pages/login.html');
+    }
 
-    // // 1. 같은 지역 사용자 검색
-    // const querySpec = {
-    //     query: "SELECT * FROM c WHERE c.location = @location AND c.id != @currentUserId",
-    //     parameters: [
-    //         { name: "@location", value: userLocation },
-    //         { name: "@currentUserId", value: currentUserId }
-    //     ]
-    // };
-    // const { resources: usersInLocation } = await usersContainer.items.query(querySpec).fetchAll();
+    const creatorId = req.session.user.id;
+    const creatorUsername = req.session.user.username;
+    const creatorEmail = req.session.user.email;
 
-    // // 2. 랜덤 사용자 선택 (예: 최대 3명)
-    // const shuffledUsers = usersInLocation.sort(() => 0.5 - Math.random());
-    // const invitedUsers = shuffledUsers.slice(0, 3);
-    // invitedUsers.push(req.user); // 채팅방 생성자도 추가
+    let creatorLocationGeoJson;
 
-    // 3. 채팅방 ID 생성
-    const roomId = `room_${new Date().getTime()}`;
+    try {
+        // 2. 생성자 위치 정보 가져오기
+        const { resource: creatorData } = await usersContainer.item(creatorId, creatorEmail).read();
+        if (!creatorData || !creatorData.locationGeoJson) {
+            console.warn(`사용자 ${creatorUsername}의 위치 정보(좌표)가 없습니다.`);
+            return res.status(400).send("チャットルームを作成するには、まずプロフィールで位置情報（郵便番号）を登録してください。");
+        }
+        creatorLocationGeoJson = creatorData.locationGeoJson;
 
-    // // 4. 이메일 초대 발송
-    // invitedUsers.forEach(user => {
-    //     if (user.id !== currentUserId) {
-    //         sendInvitationEmail(user.email, roomId);
-    //     }
-    // });
+    } catch (dbError) {
+        console.error("DB에서 사용자 정보 조회 중 오류:", dbError);
+        return res.status(500).send("サーバーエラーが発生しました。");
+    }
 
-    res.redirect(`/chat/${roomId}`); // 생성된 채팅방으로 이동
+    try {
+        // 3. 주변 사용자 검색 (10km 반경)
+        const radiusInMeters = 100000;
+        const querySpec = {
+            query: "SELECT c.id, c.username, c.email FROM c WHERE ST_DISTANCE(c.locationGeoJson, @creatorLocation) <= @radius AND c.id != @creatorId",
+            parameters: [
+                { name: "@creatorLocation", value: creatorLocationGeoJson },
+                { name: "@radius", value: radiusInMeters },
+                { name: "@creatorId", value: creatorId }
+            ]
+        };
+
+        const { resources: allNearbyUsers } = await usersContainer.items.query(querySpec).fetchAll();
+        console.log(`[채팅방 생성] ${creatorUsername} 주변 ${radiusInMeters / 1000}km 내 사용자 ${allNearbyUsers.length}명 발견.`);
+
+        // --- 4. 인원수 제한 및 랜덤 선택 로직 추가 ---
+        let usersToInvite = allNearbyUsers; // 기본값: 찾은 모든 사용자
+
+        if (allNearbyUsers.length > MAX_INVITEES) {
+            console.log(`[인원 제한] ${allNearbyUsers.length}명 중 ${MAX_INVITEES}명을 랜덤으로 선택합니다.`);
+            // 배열을 랜덤하게 섞는 함수 (Fisher-Yates Shuffle 알고리즘)
+            for (let i = usersToInvite.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [usersToInvite[i], usersToInvite[j]] = [usersToInvite[j], usersToInvite[i]]; // 요소 위치 교환
+            }
+            // 앞에서부터 MAX_INVITEES만큼만 잘라냄
+            usersToInvite = usersToInvite.slice(0, MAX_INVITEES);
+        }
+        // ------------------------------------------
+
+        // 5. 새 채팅방 ID 생성
+        const roomId = `room_${new Date().getTime()}`;
+
+        // 6. 선택된 사용자들에게 이메일 초대 발송
+        if (usersToInvite.length > 0) {
+            console.log(`[이메일 발송 시작] ${usersToInvite.length}명에게 ${roomId} 방 초대 (최대 ${MAX_INVITEES}명)`);
+            await Promise.all(usersToInvite.map(user =>
+                sendInvitationEmail(user.email, roomId, creatorUsername)
+            ));
+            console.log(`[이메일 발송 완료]`);
+        } else {
+            console.log(`[이메일 발송] 주변에 초대할 사용자가 없습니다.`);
+        }
+
+        // 7. 생성자를 새 채팅방으로 리디렉션
+        res.redirect(`/chat/${roomId}`);
+
+    } catch (error) {
+        console.error("[채팅방 생성 프로세스 중 오류]:", error);
+        res.status(500).send("チャットルームの作成中にエラーが発生しました。");
+    }
 });
+
 
 
 
