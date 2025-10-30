@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>MapLibre：日本だけ表示＋ピン設置（高ズーム）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+  <style>
+    html,body,#map { height:100%; margin:0; }
+    body { background:#BFD9F2; }
+    .marker{
+      background-image:url('https://cdn-icons-png.flaticon.com/512/684/684908.png');
+      background-size:contain; width:30px; height:30px; cursor:pointer;
+    }
+    /* ボックスズーム中の見た目を少しわかりやすく（任意） */
+    .maplibregl-ctrl-boxzoom { border:2px dashed #1e90ff; background:rgba(30,144,255,.1); }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    const STYLE_URL = 'https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json';
+
+    // 日本のパン制限（与那国側に余裕を持たせる）
+    const jpBounds = [[121.5, 19.5], [153.5, 47.5]]; // [SW, NE] (lng,lat)
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: STYLE_URL,
+      center: [138.25, 36.2],
+      zoom: 5,
+      maxZoom: 22,          // ← もっと拡大できる
+      maxBounds: jpBounds,  // ← 日本域外へ出ない
+      dragRotate: false,
+      pitchWithRotate: false
+    });
+
+    // ズームボタン表示（与那国を狙いやすく）
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch:false }), 'top-left');
+
+    // クリックでピン管理
+    const markers = [];
+
+    // --- ユーティリティ（逆マスク作成など） ---
+    function ringArea(ring){let s=0;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const[x1,y1]=ring[j],[x2,y2]=ring[i];s+=(x2-x1)*(y2+y1);}return s;}
+    const ensureCCW = r => ringArea(r) < 0 ? r : r.slice().reverse();
+    const ensureCW  = r => ringArea(r) > 0 ? r : r.slice().reverse();
+
+    function extractOuterRingsFromGC(gc){
+      const rings=[]; (gc.geometries||[]).forEach(g=>{
+        if(g.type==='Polygon'&&g.coordinates?.[0]) rings.push(g.coordinates[0]);
+        if(g.type==='MultiPolygon') (g.coordinates||[]).forEach(p=>p[0]&&rings.push(p[0]));
+      }); return rings;
+    }
+
+    function buildInverseMaskFC(japanRings){
+      const world = ensureCCW([[-180,-90],[180,-90],[180,90],[-180,90],[-180,-90]]);
+      const holes = japanRings.map(ensureCW);
+      return { type:'FeatureCollection', features:[{
+        type:'Feature', properties:{}, geometry:{ type:'Polygon', coordinates:[world, ...holes] }
+      }]};
+    }
+
+    map.on('load', async () => {
+      // 1) あなたの日本ポリゴン（japan3.geojson）を読み込み
+      const res = await fetch('japan3.geojson');
+      if(!res.ok){ alert('japan3.geojson が見つかりません（index.html と同じフォルダに置いてください）'); return; }
+      const gc = await res.json();
+      const rings = extractOuterRingsFromGC(gc);
+      if(!rings.length){ alert('japan3.geojson にポリゴンが見つかりません'); return; }
+
+      // 2) 逆マスク（世界−日本）を描画
+      const maskFC = buildInverseMaskFC(rings);
+      map.addSource('jp-mask', { type:'geojson', data:maskFC });
+      map.addLayer({ id:'jp-mask', type:'fill', source:'jp-mask',
+        paint:{ 'fill-color':'#BFD9F2', 'fill-opacity':1 }
+      });
+
+      // 3) 海外ラベルを消す（symbol レイヤを日本内に限定）
+      const japanGeom = { type:'MultiPolygon', coordinates:rings.map(r=>[ensureCW(r)]) };
+      (map.getStyle().layers||[])
+        .filter(l=>l.type==='symbol')
+        .forEach(l=>{
+          const base = l.filter || true;
+          map.setFilter(l.id, ['all', base, ['within', japanGeom]]);
+        });
+
+      // 4) クリックでピン設置
+      map.on('click', (e) => {
+        const { lng, lat } = e.lngLat;
+        const el = document.createElement('div');
+        el.className = 'marker';
+        const marker = new maplibregl.Marker(el).setLngLat([lng, lat]).addTo(map);
+        markers.push(marker);
+        console.log(`📍 ${lng.toFixed(5)}, ${lat.toFixed(5)}`);
+      });
+
+      // 5) ボックスズームを有効化（Shift+ドラッグで小島を狙いやすく）
+      map.boxZoom.enable();
+
+      // 6) 表示範囲を日本へフィット
+      let minX=180,minY=90,maxX=-180,maxY=-90;
+      rings.forEach(r=>r.forEach(([x,y])=>{ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; }));
+      map.fitBounds([[minX,minY],[maxX,maxY]], { padding: 20 });
+    });
+  </script>
+</body>
+</html>
