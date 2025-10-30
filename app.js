@@ -4,6 +4,7 @@ const { CosmosClient } = require('@azure/cosmos');
 const session = require('express-session');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 
@@ -31,6 +32,21 @@ const usersContainer = usersdatabase.container("users");
 
 app.post('/register', async (req, res) => {
     const { email, password, username, location } = req.body;
+    const postalCode = req.body.postalCode;
+
+    if (!postalCode) {
+        return res.status(400).send("郵便番号を入力してください。");
+    }
+
+    // 2. Nominatim 함수 호출
+    let centroidCoords = null;
+    try {
+        // 일본 우편번호이므로 countryCode 'JP' 전달 (기본값이지만 명시)
+        centroidCoords = await getCoordsFromPostalCodeOSM(postalCode, 'JP');
+    } catch (coordError) {
+        // API 호출 실패 시 (네트워크 오류 등), centroidCoords는 null이 됨
+        // 이 경우, locationGeoJson도 null로 저장됨
+    }
 
     // 비밀번호 암호화
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -39,7 +55,11 @@ app.post('/register', async (req, res) => {
         email,
         password: hashedPassword,
         username,
-        location
+        location: { postalCode: postalCode },
+        locationGeoJson: centroidCoords ? {
+        type: "Point",
+        coordinates: [centroidCoords.longitude, centroidCoords.latitude] // [경도, 위도]
+    } : null
     };
 
     try {
@@ -51,6 +71,51 @@ app.post('/register', async (req, res) => {
     }
 });
 
+
+
+
+
+/**
+ * Nominatim API를 사용해 우편번호로 좌표를 가져오는 함수
+ * @param {string} postalCode - 검색할 우편번호 (예: "144-0052")
+ * @param {string} countryCode - 국가 코드 (예: "JP" for Japan)
+ * @returns {Promise<{latitude: number, longitude: number} | null>} 좌표 객체 또는 null
+ */
+async function getCoordsFromPostalCodeOSM(postalCode, countryCode = 'JP') {
+    const url = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&country=${countryCode}&format=jsonv2&limit=1`;
+    
+    console.log(`[Nominatim] 요청 URL: ${url}`); // 디버깅용 로그
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                // Nominatim 사용 정책 준수를 위해 User-Agent 설정 (앱 이름/버전, 연락처 등)
+                'User-Agent': 'MyChatApp/1.0 (k024c2071@g.neec.ac.jp)' // <- 본인 앱 정보로 수정!
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Nominatim API Error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // 결과가 있고, 좌표 정보(lat, lon)가 있는지 확인
+        if (data && data.length > 0 && data[0].lat && data[0].lon) {
+            const latitude = parseFloat(data[0].lat);
+            const longitude = parseFloat(data[0].lon);
+            console.log(`[Nominatim] result: ${postalCode} -> lat=${latitude}, lon=${longitude}`);
+            return { latitude, longitude };
+        } else {
+            console.warn(`[Nominatim] 우편번호 ${postalCode}에 대한 좌표를 찾을 수 없습니다.`);
+            return null; // 결과 없음
+        }
+    } catch (error) {
+        console.error("[Nominatim] API 호출 중 오류 발생:", error);
+        throw error; // 에러를 다시 던져서 상위에서 처리하도록 함
+    }
+}
 
 
 

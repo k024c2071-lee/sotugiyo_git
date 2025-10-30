@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>新規登録 | CHATRA</title>
 
-  <!-- 共通CSS -->
   <link rel="stylesheet" href="../assets/css/base.css" />
   <link rel="stylesheet" href="../assets/css/layout.css" />
 
-  <!-- signup専用CSS -->
   <link rel="stylesheet" href="../assets/css/pages/signup.css" />
 </head>
 <body class="auth-body">
@@ -24,18 +22,18 @@
       <form class="auth-form" action="/register" method="POST" autocomplete="on">
         <label class="field">
           <span>表示名（ニックネーム）</span>
-          <input type="text" id = "username" name="username" placeholder="たび太郎" required />
+          <input type="text" id="username" name="username" placeholder="たび太郎" required />
         </label>
 
         <label class="field">
           <span>メールアドレス</span>
-          <input type="email" id = "email" name="email" placeholder="you@example.com" required />
+          <input type="email" id="email" name="email" placeholder="you@example.com" required />
         </label>
 
         <label class="field">
           <span>パスワード</span>
           <div class="password-wrap">
-            <input type="password" id = "password" name="password" placeholder="" required />
+            <input type="password" id="password" name="password" placeholder="" required />
             <button type="button" class="pw-toggle">表示</button>
           </div>
         </label>
@@ -43,19 +41,34 @@
         <label class="field">
           <span>パスワード（確認）</span>
           <div class="password-wrap">
-            <input type="password" id = "password2" name="password2" placeholder="もう一度入力" required />
+            <input type="password" id="password2" name="password2" placeholder="もう一度入力" required />
             <button type="button" class="pw-toggle">表示</button>
           </div>
         </label>
 
-        <label class="field">
-          <span>あなたの住所</span>
-          <input type="text" id= "location" name="location" placeholder="例：東京都大田区西蒲田５丁目２３−２２" />
-        </label>
+        <fieldset class="address-group">
+          <legend>あなたの住所</legend>
 
+          <label class="field postal-code-field">
+            <span>郵便番号</span>
+            <div class="input-with-button">
+              <input type="text" id="postal-code" name="postalCode" placeholder="例：144-0052" required />
+              <button type="button" onclick="searchPostalCode()">検索</button>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>都道府県・市区町村</span>
+            <input type="text" id="address1" name="address1" placeholder="例：東京都大田区" required />
+          </label>
+
+          <label class="field">
+            <span>番地・建物名・部屋番号</span>
+            <input type="text" id="address2" name="address2" placeholder="例：西蒲田５丁目２３−２２ マンション名 101号室" />
+          </label>
+        </fieldset>
         <label class="check">
-          <input type="checkbox" />
-          <span>利用規約に同意します</span>
+          <input type="checkbox" required /> <span>利用規約に同意します</span>
         </label>
 
         <button type="submit" class="btn primary">登録してはじめる</button>
@@ -67,6 +80,75 @@
       </form>
     </div>
   </main>
+
+  <script>
+    function searchPostalCode() {
+      // ここに郵便番号検索APIとの連携ロジックを実装します
+      const postalCode = document.getElementById('postal-code').value;
+      if (postalCode) {
+        alert(postalCode + "の住所を検索します。（実装が必要です）");
+        // 例: fetch APIを使って日本の郵便番号API (zipcloudなど) を呼び出し、
+        // 結果を address1 フィールドに自動入力するなど
+      } else {
+        alert("郵便番号を入力してください。");
+      }
+    }
+
+
+    async function searchPostalCode() {
+  const postalCodeInput = document.getElementById('postal-code');
+  const address1Input = document.getElementById('address1');
+  const postalCode = postalCodeInput.value;
+
+  if (!postalCode) {
+    alert("郵便番号を入力してください。");
+    return;
+  }
+
+  // zipcloud API URL 생성 (하이픈(-) 제거 필요)
+  const apiUrl = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${postalCode.replace('-', '')}`;
+
+  try {
+    // fetch API를 사용해 zipcloud 서버에 GET 요청
+    const response = await fetch(apiUrl);
+    const data = await response.json(); // 응답을 JSON 형태로 파싱
+
+    // API 응답 상태 확인
+    if (data.status === 200 && data.results) {
+      // 성공적으로 주소를 찾았을 경우
+      const result = data.results[0];
+      // 주소 조합 (都道府県 + 市区町村 + 町域名)
+      const fullAddress = result.address1 + result.address2 + result.address3;
+      address1Input.value = fullAddress; // address1 필드에 자동 입력
+    } else if (data.status === 400 || data.status === 500) {
+      // 우편번호 형식이 잘못되었거나, 해당 주소가 없을 경우
+      alert(`住所が見つかりませんでした: ${data.message}`);
+      address1Input.value = ''; // 필드 비우기
+    } else {
+      alert("予期せぬエラーが発生しました。");
+      address1Input.value = '';
+    }
+  } catch (error) {
+    console.error("郵便番号APIの呼び出し中にエラーが発生しました:", error);
+    alert("住所の検索中にネットワークエラーが発生しました。");
+    address1Input.value = '';
+  }
+}
+
+    // パスワード表示切り替えのスクリプト (もし必要であれば)
+    document.querySelectorAll('.pw-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const input = button.previousElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '非表示';
+            } else {
+                input.type = 'password';
+                button.textContent = '表示';
+            }
+        });
+    });
+  </script>
 
 </body>
 </html>
