@@ -184,7 +184,7 @@ app.post('/login', async (req, res) => {
       };
       
 
-      const redirectUrl = req.session.redirectTo || './pages/menu.html';
+      const redirectUrl = req.session.redirectTo || './pages/map.html';
       delete req.session.redirectTo;
 
       // 세션 저장이 완료된 후 리디렉션합니다.
@@ -219,7 +219,7 @@ app.get('/chat/:roomId', (req, res) => {
         //    채팅방 HTML 파일을 전송합니다. 
         //    (파일 경로는 본인 프로젝트에 맞게 수정하세요. 
         //     채팅 스크립트가 index.html에 있다면 index.html로 설정)
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        res.sendFile(path.join(__dirname, 'public/pages', 'map.html'));
     }
 });
 
@@ -240,86 +240,128 @@ app.get('/logout', (req, res) => {
 
 
 
-const MAX_INVITEES = 10;
+// const MAX_INVITEES = 10;
 
-app.post('/create-room', async (req, res) => {
-    // 1. 로그인 확인
-    if (!req.session.user || !req.session.user.id || !req.session.user.email) {
-        return res.status(401).redirect('/pages/login.html');
-    }
+// app.post('/create-room', async (req, res) => {
+//     // 1. 로그인 확인
+//     if (!req.session.user || !req.session.user.id || !req.session.user.email) {
+//         return res.status(401).redirect('/pages/login.html');
+//     }
 
-    const creatorId = req.session.user.id;
-    const creatorUsername = req.session.user.username;
-    const creatorEmail = req.session.user.email;
+//     const { name, description, isPublic, password, lng, lat } = req.body;
+//     const { username: creatorUserName, id: creatorId, email: creatorEmail } = req.session.user;
 
-    let creatorLocationGeoJson;
+//     // const creatorId = req.session.user.id;
+//     // const creatorUsername = req.session.user.username;
+//     // const creatorEmail = req.session.user.email;
 
-    try {
-        // 2. 생성자 위치 정보 가져오기
-        const { resource: creatorData } = await usersContainer.item(creatorId, creatorEmail).read();
-        if (!creatorData || !creatorData.locationGeoJson) {
-            console.warn(`ユーザ ${creatorUsername} の位置情報が登録されていません。`);
-            return res.status(400).send("チャットルームを作成するには、まずプロフィールで位置情報（郵便番号）を登録してください。");
-        }
-        creatorLocationGeoJson = creatorData.locationGeoJson;
+//     let creatorLocationGeoJson;
 
-    } catch (dbError) {
-        console.error("DB参照エラー", dbError);
-        return res.status(500).send("サーバーエラーが発生しました。");
-    }
+//         if (!name || lng === undefined || lat === undefined) {
+//         return res.status(400).send("ルーム名と座標は必須です。");
+//     }
 
-    try {
-        // 3. 주변 사용자 검색 (10km 반경)
-        const radiusInMeters = 100000;
-        const querySpec = {
-            query: "SELECT c.id, c.username, c.email FROM c WHERE ST_DISTANCE(c.locationGeoJson, @creatorLocation) <= @radius AND c.id != @creatorId",
-            parameters: [
-                { name: "@creatorLocation", value: creatorLocationGeoJson },
-                { name: "@radius", value: radiusInMeters },
-                { name: "@creatorId", value: creatorId }
-            ]
-        };
+//     try {
+//         // 2. 생성자 위치 정보 가져오기
+//         const { resource: creatorData } = await usersContainer.item(creatorId, creatorEmail).read();
+//         if (!creatorData || !creatorData.locationGeoJson) {
+//             console.warn(`ユーザ ${creatorUsername} の位置情報が登録されていません。`);
+//             return res.status(400).send("チャットルームを作成するには、まずプロフィールで位置情報（郵便番号）を登録してください。");
+//         }
+//         creatorLocationGeoJson = creatorData.locationGeoJson;
 
-        const { resources: allNearbyUsers } = await usersContainer.items.query(querySpec).fetchAll();
-        console.log(`[チャットルーム生成] ${creatorUsername} 周り ${radiusInMeters / 1000}km 内のユーザ ${allNearbyUsers.length}人発見`);
+//     } catch (dbError) {
+//         console.error("DB参照エラー", dbError);
+//         return res.status(500).send("サーバーエラーが発生しました。");
+//     }
 
-        // --- 4. 인원수 제한 및 랜덤 선택 로직 추가 ---
-        let usersToInvite = allNearbyUsers; // 기본값: 찾은 모든 사용자
+//     try {
+//         // 3. 주변 사용자 검색 (10km 반경)
+//         const radiusInMeters = 100000;
+//         const querySpec = {
+//             query: "SELECT c.id, c.username, c.email FROM c WHERE ST_DISTANCE(c.locationGeoJson, @creatorLocation) <= @radius AND c.id != @creatorId",
+//             parameters: [
+//                 { name: "@creatorLocation", value: creatorLocationGeoJson },
+//                 { name: "@radius", value: radiusInMeters },
+//                 { name: "@creatorId", value: creatorId }
+//             ]
+//         };
 
-        if (allNearbyUsers.length > MAX_INVITEES) {
-            console.log(`[人数制限] ${allNearbyUsers.length}の中 ${MAX_INVITEES}人だけ招待します。ランダムに選択中...`);
-            // 배열을 랜덤하게 섞는 함수 (Fisher-Yates Shuffle 알고리즘)
-            for (let i = usersToInvite.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [usersToInvite[i], usersToInvite[j]] = [usersToInvite[j], usersToInvite[i]]; // 요소 위치 교환
-            }
-            // 앞에서부터 MAX_INVITEES만큼만 잘라냄
-            usersToInvite = usersToInvite.slice(0, MAX_INVITEES);
-        }
-        // ------------------------------------------
+//         const { resources: allNearbyUsers } = await usersContainer.items.query(querySpec).fetchAll();
+//         console.log(`[チャットルーム生成] ${creatorUsername} 周り ${radiusInMeters / 1000}km 内のユーザ ${allNearbyUsers.length}人発見`);
 
-        // 5. 새 채팅방 ID 생성
-        const roomId = `room_${new Date().getTime()}`;
+//         // --- 4. 인원수 제한 및 랜덤 선택 로직 추가 ---
+//         let usersToInvite = allNearbyUsers; // 기본값: 찾은 모든 사용자
 
-        // 6. 선택된 사용자들에게 이메일 초대 발송
-        if (usersToInvite.length > 0) {
-            console.log(`メールを ${usersToInvite.length}人に ${roomId}で (最大 ${MAX_INVITEES}人)`);
-            await Promise.all(usersToInvite.map(user =>
-                sendInvitationEmail(user.email, roomId, creatorUsername)
-            ));
-            console.log(`メール送信が完了しました。`);
-        } else {
-            console.log(`招待できるユーザーが見つかりませんでした。`);
-        }
+//         if (allNearbyUsers.length > MAX_INVITEES) {
+//             console.log(`[人数制限] ${allNearbyUsers.length}の中 ${MAX_INVITEES}人だけ招待します。ランダムに選択中...`);
+//             // 배열을 랜덤하게 섞는 함수 (Fisher-Yates Shuffle 알고리즘)
+//             for (let i = usersToInvite.length - 1; i > 0; i--) {
+//                 const j = Math.floor(Math.random() * (i + 1));
+//                 [usersToInvite[i], usersToInvite[j]] = [usersToInvite[j], usersToInvite[i]]; // 요소 위치 교환
+//             }
+//             // 앞에서부터 MAX_INVITEES만큼만 잘라냄
+//             usersToInvite = usersToInvite.slice(0, MAX_INVITEES);
+//         }
+//         // ------------------------------------------
 
-        // 7. 생성자를 새 채팅방으로 리디렉션
-        res.redirect(`/chat/${roomId}`);
 
-    } catch (error) {
-        console.error("チャットルーム生成エラー", error);
-        res.status(500).send("チャットルームの作成中にエラーが発生しました。");
-    }
-});
+
+//     const newRoom = {
+//         // Cosmos DB는 id를 자동으로 생성하지 않으므로 직접 만듭니다.
+//         roomid: `room_${new Date().getTime()}`,
+//         name,
+//         description,
+//         isPublic,
+//         password: isPublic ? null : await bcrypt.hash(password, 10), // 비공개일 경우 암호화
+//         creatorId,
+//         creatorName,
+//         createdAt: new Date(),
+//         // GeoJSON 형식으로 좌표 저장 (지도 표기용)
+//         location: {
+//             type: "Point",
+//             coordinates: [parseFloat(lng), parseFloat(lat)] // [경도, 위도]
+//         }
+//     };
+
+//     try {
+//         const { resource: createdRoom } = await roomsContainer.items.create(newRoom);
+//         console.log(`[ルーム作成] ${creatorName}が新しいルームを作成: ${name}`);
+        
+//         // (중요) 방을 만들었으면, 방 목록을 모든 클라이언트에게 갱신하라고 알립니다.
+//         io.emit('rooms updated'); // 모든 접속자에게 알림
+        
+//         res.status(201).json(createdRoom); // 생성된 룸 정보 반환
+//     } catch (error) {
+//         console.error("ルームのDB保存エラー:", error);
+//         res.status(500).send("ルーム作成中にエラーが発生しました。");
+//     }
+
+
+
+
+//         // 6. 선택된 사용자들에게 이메일 초대 발송
+//         if (usersToInvite.length > 0) {
+//             console.log(`メールを ${usersToInvite.length}人に ${roomId}で (最大 ${MAX_INVITEES}人)`);
+//             await Promise.all(usersToInvite.map(user =>
+//                 sendInvitationEmail(user.email, roomId, creatorUsername)
+//             ));
+//             console.log(`メール送信が完了しました。`);
+//         } else {
+//             console.log(`招待できるユーザーが見つかりませんでした。`);
+//         }
+
+//         // 7. 생성자를 새 채팅방으로 리디렉션
+//         res.redirect(`/chat/${roomId}`);
+
+//     } catch (error) {
+//         console.error("チャットルーム生成エラー", error);
+//         res.status(500).send("チャットルームの作成中にエラーが発生しました。");
+//     }
+// });
+
+
+
 
 
 
@@ -390,6 +432,34 @@ io.on('connection', (socket) => {
       console.log(`${username} joined ${roomId} room`);
     });
 
+
+
+
+    socket.on('request history', async (roomId) => {
+        if (!roomId) return;
+
+        try {
+            // 해당 방의 메시지만 쿼리 (예: 최근 50개)
+            const querySpec = {
+                query: "SELECT * FROM c WHERE c.roomId = @roomId ORDER BY c.timestamp DESC OFFSET 0 LIMIT 50",
+                parameters: [{ name: "@roomId", value: roomId }]
+            };
+            const { resources: messages } = await chatsContainer.items.query(querySpec).fetchAll();
+            
+            // 쿼리 결과는 DESC (최신순)이므로, 클라이언트 표시를 위해 ASC (오래된순)으로 변경
+            messages.reverse(); 
+
+            // 요청한 사용자에게만(socket.emit) 내역 전송
+            socket.emit('chat history', messages);
+            console.log(`[履歴] ${username}に ${roomId}の履歴 ${messages.length}件を送信`);
+
+        } catch (error) {
+            console.error("チャット履歴の取得エラー:", error);
+        }
+    });
+
+
+
     socket.on('chat message', async (data) => {
         const { roomId, message } = data;
         const sender = username;
@@ -425,6 +495,73 @@ io.on('connection', (socket) => {
        console.log(`user disconnected`); 
     });
 });
+
+const roomsContainer = chartsdatabase.container("charts");
+
+app.post('/api/create-room', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).send("ログインが必要です。");
+    }
+
+    const { name, description, isPublic, password, lng, lat } = req.body;
+    const { username: creatorName, id: creatorId } = req.session.user;
+
+    if (!name || lng === undefined || lat === undefined) {
+        return res.status(400).send("ルーム名と座標は必須です。");
+    }
+
+    const newRoom = {
+        // Cosmos DB는 id를 자동으로 생성하지 않으므로 직접 만듭니다.
+        roomid: `room_${new Date().getTime()}`,
+        name,
+        description,
+        isPublic,
+        password: isPublic ? null : await bcrypt.hash(password, 10), // 비공개일 경우 암호화
+        creatorId,
+        creatorName,
+        createdAt: new Date(),
+        // GeoJSON 형식으로 좌표 저장 (지도 표기용)
+        location: {
+            type: "Point",
+            coordinates: [parseFloat(lng), parseFloat(lat)] // [경도, 위도]
+        }
+    };
+
+    try {
+        const { resource: createdRoom } = await roomsContainer.items.create(newRoom);
+        console.log(`[ルーム作成] ${creatorName}が新しいルームを作成: ${name}`);
+        
+        // (중요) 방을 만들었으면, 방 목록을 모든 클라이언트에게 갱신하라고 알립니다.
+        io.emit('rooms updated'); // 모든 접속자에게 알림
+        
+        res.status(201).json(createdRoom); // 생성된 룸 정보 반환
+    } catch (error) {
+        console.error("ルームのDB保存エラー:", error);
+        res.status(500).send("ルーム作成中にエラーが発生しました。");
+    }
+});
+
+
+
+app.get('/api/get-rooms', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).send("ログインが必要です。");
+    }
+    
+    try {
+        // 모든 룸 정보를 가져옵니다 (필요시 쿼리 최적화)
+        const querySpec = {
+            query: "SELECT * FROM c WHERE STARTSWITH(c.roomid, 'room_') ORDER BY c.createdAt DESC"
+        };
+        const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+        res.status(200).json(rooms);
+    } catch (error) {
+        console.error("ルーム一覧の取得エラー:", error);
+        res.status(500).send("ルーム情報の取得に失敗しました。");
+    }
+});
+
+
 
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

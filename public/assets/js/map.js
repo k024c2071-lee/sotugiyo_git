@@ -1,23 +1,51 @@
 // /public/assets/js/pages/map.js
 document.addEventListener("DOMContentLoaded", () => {
+
+    // console.log("A. DOMContentLoaded 이벤트 발생. 스크립트 시작."); // <-- 로그 A
+
+    const socket = io();
     // ==========================
     //  基本設定
     // ==========================
     const STYLE_URL = "https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json";
     const JP_BOUNDS = [[121.5, 19.5], [153.5, 47.5]];
   
-    const map = new maplibregl.Map({
-      container: "map",
-      style: STYLE_URL,
-      center: [138.25, 36.2],
-      zoom: 5,
-      maxZoom: 22,
-      maxBounds: JP_BOUNDS,
-      dragRotate: false,
-      pitchWithRotate: false,
-    });
+    // const map = new maplibregl.Map({
+    //   container: "map",
+    //   style: STYLE_URL,
+    //   center: [138.25, 36.2],
+    //   zoom: 5,
+    //   maxZoom: 22,
+    //   maxBounds: JP_BOUNDS,
+    //   dragRotate: false,
+    //   pitchWithRotate: false,
+    // });
+
+
+    try {
+        map = new maplibregl.Map({
+            container: "map",
+            style: STYLE_URL,
+            center: [138.25, 36.2],
+            zoom: 5,
+            maxZoom: 22,
+            maxBounds: JP_BOUNDS,
+            dragRotate: false,
+            pitchWithRotate: false,
+        });
+        
+        console.log("C. map 객체 생성자(new) 실행 완료."); // <-- 로그 C
+    } catch (err) {
+        console.error("💥 맵 객체 생성(new) 중 즉시 에러 발생:", err); // <-- 에러 로그
+        return; // 맵 생성이 안되면 이후 코드 실행 불가
+    }
+
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-left");
   
+
+    // map.on("click", (e) => {
+    //     alert("지도 클릭 성공! 좌표: " + e.lngLat.lng);
+    // });
     // ==========================
     //  状態（State）
     // ==========================
@@ -44,6 +72,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatForm = document.getElementById("chatForm");
     const chatInput = document.getElementById("chatInput");
     const chatBackBtn = document.getElementById("chatBackBtn");
+
+    let currentRoomId = null;
   
     const modal = document.getElementById("roomModal");
     const backdrop = document.getElementById("modalBackdrop");
@@ -55,6 +85,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const roomPassword = document.getElementById("roomPassword");
     const roomLng = document.getElementById("roomLng");
     const roomLat = document.getElementById("roomLat");
+
+    
   
     // ==========================
     //  ユーティリティ（地図マスク）
@@ -130,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (isPublic) roomPassword.value = "";
     });
   
-    roomForm.addEventListener("submit", (e) => {
+    roomForm.addEventListener("submit", async (e) => {
       e.preventDefault();
   
       const payload = {
@@ -151,13 +183,52 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
   
-      console.log("✅ ルーム作成データ", payload);
-      alert("サンプル：ルーム作成データをコンソールに出力しました。");
-      closeRoomModal();
+
+      try {
+          const response = await fetch('/api/create-room', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+              alert("ルームが作成されました！");
+              // 2. (중요) 서버가 생성된 룸 정보를 JSON으로 응답
+              const newRoom = await response.json();
+
+              // const chatSystemId = newRoom.id
+            
+              // // 3. (중요) 응답받은 JSON에서 roomid를 추출
+              const newRoomId = newRoom.roomid;
+              closeRoomModal();
+              if (!newRoomId) {
+                alert("룸 생성은 성공했으나, id를 받지 못했습니다.");
+                closeRoomModal();
+                return;
+              }
+              alert("ルームが作成されました！チャットルームに移動します。");
+              window.location.href = `/chat/${newRoomId}`;
+              // 핀 추가 로직은 'rooms updated' 이벤트를 통해 처리되므로 여기서 따로 안 함
+          } else {
+              const errorText = await response.text();
+              alert(`ルーム作成失敗: ${errorText}`);
+          }
+      } catch (error) {
+          console.error("ルーム作成APIエラー:", error);
+          alert("ルーム作成中にネットワークエラーが発生しました。");
+      }
     });
+
+      // console.log("✅ ルーム作成データ", payload);
+      // alert("サンプル：ルーム作成データをコンソールに出力しました。");
+      // closeRoomModal();
   
     [closeModalBtn, cancelBtn, backdrop].forEach((el) => el.addEventListener("click", closeRoomModal));
   
+
+
     // ==========================
     //  サイドパネル
     // ==========================
@@ -201,15 +272,22 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================
     //  ルーム一覧・チャット（ダミー）
     // ==========================
-    const DUMMY_ROOMS = [
-      { id: 1, name: "東京・観光情報交換ルーム", desc: "浅草・渋谷・新宿" },
-      { id: 2, name: "沖縄ダイビング仲間募集", desc: "那覇・慶良間" },
-      { id: 3, name: "北海道グルメ", desc: "札幌・小樽・函館" },
-      { id: 4, name: "埼玉：四季彩ルート", desc: "長瀞・秩父" },
-    ];
+
+    // const DUMMY_ROOMS = [
+    //   { id: 1, name: "東京・観光情報交換ルーム", desc: "浅草・渋谷・新宿" },
+    //   { id: 2, name: "沖縄ダイビング仲間募集", desc: "那覇・慶良間" },
+    //   { id: 3, name: "北海道グルメ", desc: "札幌・小樽・函館" },
+    //   { id: 4, name: "埼玉：四季彩ルート", desc: "長瀞・秩父" },
+    // ];
   
     function renderRoomList(rooms) {
       roomListEl.innerHTML = "";
+      if (!rooms || rooms.length === 0) {
+          roomListEl.innerHTML = '<li class="muted">まだルームがありません。</li>';
+          return;
+      }
+
+
       rooms.forEach((room) => {
         const li = document.createElement("li");
         li.className = "room-item";
@@ -218,31 +296,135 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="room-item-desc">${room.desc || ""}</div>
         `;
         li.addEventListener("click", () => {
+          currentRoomId = room.roomid; // ✅ 現在のルームIDを更新
           chatRoomName.textContent = room.name;
           chatBody.innerHTML = `<div class="chat-msg chat-msg-other">${room.name} へようこそ！</div>`;
+
+  
+          
           showPanelView("chat");
           sidePanel.classList.add("chat-mode");
+
+          window.location.href = `/chat/${currentRoomId}`;
+
+          socket.emit('join room', currentRoomId);
+          socket.emit('request history', currentRoomId);
         });
         roomListEl.appendChild(li);
       });
     }
-    renderRoomList(DUMMY_ROOMS);
+    // renderRoomList(DUMMY_ROOMS);
+
+    async function fetchAndRenderRooms() {
+        try {
+            const response = await fetch('/api/get-rooms');
+            if (!response.ok) {
+                if(response.status === 401) {
+                    alert("セッションが切れました。ログインしてください。");
+                    window.location.href = '/pages/login.html'; // ログインページへ
+                }
+                throw new Error("ルームリストの取得に失敗");
+            }
+            const rooms = await response.json();
+            renderRoomList(rooms);
+            
+            // ✅ (추가) 지도에 핀을 그리는 로직
+            // 기존 핀들 제거 (아직 핀 저장 로직이 없으므로 생략)
+            // rooms.forEach(room => addPinToMap(room));
+
+            // -----------------------------------------------------
+            const path = window.location.pathname;
+        // 정규식: /chat/ 뒤에 /가 아닌 문자가 1개 이상 있는지 확인
+            const chatUrlMatch = path.match(/^\/chat\/([^/]+)/); 
+
+        if (chatUrlMatch) {
+            const roomIdFromUrl = chatUrlMatch[1]; // URL에서 roomid 추출
+            
+            // 방금 불러온 rooms 목록에서 해당 ID를 찾습니다.
+            // (주의: room.id가 맞는지 확인. 서버가 'id'를 보낸다면 맞음)
+            const roomToOpen = rooms.find(r => r.roomid === roomIdFromUrl); 
+
+            if (roomToOpen) {
+                // ----------------------------------------------------
+                // ✅ 찾았다면, 리스트의 'click' 이벤트와 동일한 작업을 수행
+                // ----------------------------------------------------
+                currentRoomId = roomToOpen.roomid; // 현재 룸 ID 설정
+                chatRoomName.textContent = roomToOpen.name;
+                chatBody.innerHTML = `<div class="chat-msg chat-msg-other">${roomToOpen.name} へようこそ！</div>`;
+                
+                openSidePanel(); // 사이드 패널 열기
+                showPanelView("chat"); // 채팅 뷰 보여주기
+                sidePanel.classList.add("chat-mode"); // 채팅 모드 활성화
+
+                // 소켓 연결 및 히스토리 요청
+                socket.emit('join room', currentRoomId);
+                socket.emit('request history', currentRoomId);
+            } else {
+                // URL은 /chat/...인데 목록에 없는 방일 경우
+                console.warn("URLのルームIDが見つかりません:", roomIdFromUrl);
+            }
+        }
+        // ----------------------------------------------------
+
+        } catch (error) {
+            console.error("ルームリストの取得エラー:", error);
+            roomListEl.innerHTML = '<li class="muted">ルームの読み込みに失敗しました。</li>';
+        }
+    }
   
     chatForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const text = chatInput.value.trim();
-      if (!text) return;
-      const div = document.createElement("div");
-      div.className = "chat-msg chat-msg-me";
-      div.textContent = text;
-      chatBody.appendChild(div);
+      if (!text || !currentRoomId) return;
+      // const div = document.createElement("div");
+      // div.className = "chat-msg chat-msg-me";
+      // div.textContent = text;
+      // chatBody.appendChild(div);
       chatInput.value = "";
-      chatBody.scrollTop = chatBody.scrollHeight;
+      // chatBody.scrollTop = chatBody.scrollHeight;
     });
   
     chatBackBtn.addEventListener("click", () => {
       showPanelView("list");
       sidePanel.classList.remove("chat-mode");
+      currentRoomId = null;
+    });
+
+
+
+      socket.on('chat message', (msg) => {
+          // 내가 지금 보고 있는 방의 메시지일 때만 화면에 그립니다.
+          
+              const div = document.createElement("div");
+              
+              // (간단한 예시: msg.sender와 내 세션 username 비교 필요)
+              // 여기서는 간단하게 'other'로 처리 (추후 내 세션 username과 비교 로직 필요)
+              div.className = "chat-msg chat-msg-other"; // 
+              div.textContent = `${msg.sender}: ${msg.message}`;
+              
+              chatBody.appendChild(div);
+              chatBody.scrollTop = chatBody.scrollHeight;
+  
+        })
+
+
+      socket.on('chat history', (messages) => {
+        chatBody.innerHTML = ''; // 기존 내역 초기화
+        messages.forEach(msg => {
+            const div = document.createElement("div");
+            div.className = "chat-msg chat-msg-other"; // (내 메시지인지 비교 필요)
+            div.textContent = `${msg.sender}: ${msg.message}`;
+            chatBody.appendChild(div);
+        });
+        chatBody.scrollTop = chatBody.scrollHeight; // 스크롤 맨 아래로
+    });
+    
+
+
+    // ✅ 新規追加: サーバーからルーム更新通知を受信
+    socket.on('rooms updated', () => {
+        console.log("ルームリストが更新されました。再読み込みします...");
+        fetchAndRenderRooms(); // 룸 목록과 핀을 다시 불러옵니다.
     });
   
     // ==========================
@@ -269,23 +451,34 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   
+
+
+    fetchAndRenderRooms();
+
     // ==========================
     //  地図ロード後の処理
     // ==========================
     map.on("load", async () => {
       // --- 日本ポリゴンの読み込み ---
-      const res = await fetch("japan3.geojson");
+
+      console.log("1. 'load' 이벤트 시작됨.")
+
+      const res = await fetch("/japan3.geojson");
       if (!res.ok) {
         alert("japan3.geojson が見つかりません（map.html と同じフォルダに置いてください）");
         return;
       }
       const geo = await res.json();
+
+      console.log("2. 'load' 성공.")
   
       const jpRings = extractJapanRings(geo);
       if (!jpRings.length) {
         alert("japan3.geojson にポリゴンが見つかりません");
         return;
       }
+
+      console.log("3. 폴리건로드.")
   
       // マスク表示
       const maskFC = buildInverseJapanMask(jpRings);
@@ -306,10 +499,14 @@ document.addEventListener("DOMContentLoaded", () => {
           map.setFilter(l.id, ["all", base, ["within", japanGeom]]);
         });
   
+
+        console.log("4 로드중.")
       // ==========================
       //  クリックでピンを「移動」させる（常に1個）
       // ==========================
       map.on("click", (e) => {
+
+        console.log("성공!!!!!!!!!!!!!!")
         const { lng, lat } = e.lngLat;
         const roundedLng = lng.toFixed(5);
         const roundedLat = lat.toFixed(5);
@@ -357,6 +554,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 0);
       });
   
+
       // 視野を日本にフィット
       let minX = 180,
         minY = 90,
@@ -379,4 +577,3 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     });
   });
-  
