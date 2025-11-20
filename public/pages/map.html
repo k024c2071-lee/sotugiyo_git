@@ -28,6 +28,7 @@
     <nav class="side-nav">
       <button class="side-item" data-view="search">🔍 ルーム検索</button>
       <button class="side-item" data-view="list">📋 ルーム一覧</button>
+      <button class="side-item" data-view="list2">📋 履歴</button>
     </nav>
 
     <div class="side-content">
@@ -48,6 +49,13 @@
         <div class="muted" style="margin-bottom:8px;">ルームを選択するとチャット画面に切り替わります。</div>
         <ul class="room-list" id="roomList"></ul>
       </div>
+
+       <!-- チャットルーム履歴 -->
+       <div class="panel-view" id="view-list2" style="display:none;">
+        <div class="muted" style="margin-bottom:8px;">ルームを選択するとチャット画面に切り替わります。</div>
+        <ul class="room-list" id="roomList2"></ul>
+      </div>
+
 
       <!-- チャットビュー -->
       <div class="panel-view" id="view-chat" style="display:none;">

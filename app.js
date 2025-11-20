@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 
-
+const roomCache = {};
 
 // 서버 실행
 
@@ -425,11 +425,36 @@ io.on('connection', (socket) => {
     }
     console.log(`${username} 様がつながりました.`);
 
-    socket.on('join room', (roomId) => {
+    socket.on('join room', async (roomId) => {
       // const { roomId, sender} = data; // 클라이언트가 보낸 data 객체에서 roomId와 userInfo를 추출
       socket.join(roomId);
       // socket.username = sender; // userInfo 객체 안의 sender를 사용
       console.log(`${username} joined ${roomId} room`);
+           // 1. 캐시 확인: 이미 룸 이름이 있으면 DB 쿼리 없이 종료
+    if (roomCache[roomId]) {
+        return;
+    }
+
+    // 2. 캐시에 없으면 DB에서 가져와 저장 (최초 1회 또는 서버 재시작 시 발생)
+    try {
+        const querySpec = {
+            query: "SELECT c.name FROM c WHERE c.roomid = @roomId", 
+            parameters: [{ name: "@roomId", value: roomId }]
+        };
+        const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+        
+        if (rooms && rooms.length > 0) {
+            // **여기서 roomCache에 룸 이름을 저장합니다.**
+            roomCache[roomId] = rooms[0].name; 
+            console.log(`[캐시 저장] 룸 이름 '${rooms[0].name}'을(를) 캐시에 저장했습니다.`);
+        } else {
+            roomCache[roomId] = '알 수 없는 방'; // 방어 코드
+        }
+    } catch (error) {
+        console.error("ルーム名前のキャッシング中のDBエラー:", error);
+        roomCache[roomId] = 'DB 오류 발생 방';
+    }
+      
     });
 
 
@@ -463,9 +488,29 @@ io.on('connection', (socket) => {
     socket.on('chat message', async (data) => {
         const { roomId, message } = data;
         const sender = username;
+            // 1. **캐시에서 룸 이름을 가져옵니다. (DB 접근 없음!)**
+        let roomName = roomCache[roomId];
+    
+    // 2. 캐시 미스 발생 시 (매우 드문 경우) DB 폴백 쿼리
+    if (!roomName) {
+        // 이 부분은 join room 로직에서 이미 처리되었어야 하지만, 안전을 위해 남겨둡니다.
+        const querySpec = {
+            query: "SELECT c.name FROM c WHERE c.roomid = @roomId",
+            parameters: [{ name: "@roomId", value: roomId }]
+        };
+        try {
+            const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+            roomName = (rooms && rooms.length > 0) ? rooms[0].name : '알 수 없는 방';
+            roomCache[roomId] = roomName; // 캐시 업데이트
+        } catch (error) {
+            console.error("채팅 메시지 전송 중 룸 이름 DB 조회 오류:", error);
+            roomName = 'DB 오류 방';
+        }
+    } // if (!roomName)
 
         const chatMessage = {
             roomId,
+            roomName : roomName,
             sender,
             message,
             timestamp: new Date()
@@ -527,8 +572,19 @@ app.post('/api/create-room', async (req, res) => {
         }
     };
 
+    const chatMessage = {
+        roomId : newRoom.roomid,
+        roomName : name,
+        sender : creatorName,
+        message : "チャットルームが作られました！",
+        timestamp: new Date()
+    };
+
+
     try {
         const { resource: createdRoom } = await roomsContainer.items.create(newRoom);
+        // チャットルーム履歴に残せるため
+        await chatsContainer.items.create(chatMessage);
         console.log(`[ルーム作成] ${creatorName}が新しいルームを作成: ${name}`);
         
         // (중요) 방을 만들었으면, 방 목록을 모든 클라이언트에게 갱신하라고 알립니다.
@@ -561,9 +617,31 @@ app.get('/api/get-rooms', async (req, res) => {
     }
 });
 
+// --------------------------------------------------------------------------
+// ルーム履歴
+// --------------------------------------------------------------------------
+app.get('/api/get-historyrooms', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).send("ログインが必要です。");
+    }
+    
+    try {
+        // 모든 룸 정보를 가져옵니다 (필요시 쿼리 최적화)
+        const querySpec = {
+                query: "SELECT * FROM c WHERE STARTSWITH(c.roomId, 'room_') AND c.sender = @email ORDER BY c.timestamp DESC OFFSET 0 LIMIT 50",
+                parameters: [{ name: "@email", value: req.session.user.email }]
+        };
+        const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+         console.log(`${req.session.user.email}session mail---------------------------`);
+        res.status(200).json(rooms);
+    } catch (error) {
+        console.error("ルーム履歴の取得エラー:", error);
+        res.status(500).send("ルーム情報の取得に失敗しました。");
+    }
+});
 
 // --------------------------------------------------------------------------
-// ✅ API 3: 룸 검색 (신규 추가)
+// 룸 검색 (신규 추가)
 // --------------------------------------------------------------------------
 app.get('/api/search-rooms', async (req, res) => {
     if (!req.session.user) {

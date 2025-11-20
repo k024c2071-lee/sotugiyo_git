@@ -64,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
     const viewSearch = document.getElementById("view-search");
     const viewList = document.getElementById("view-list");
+    const viewList2 = document.getElementById("view-list2");
     const viewChat = document.getElementById("view-chat");
 
     const searchInput = document.getElementById("searchInput");
@@ -71,6 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchResultList = document.getElementById("searchResultList"); 
   
     const roomListEl = document.getElementById("roomList");
+    const roomListE2 = document.getElementById("roomList2");
     const chatRoomName = document.getElementById("chatRoomName");
     const chatBody = document.getElementById("chatBody");
     const chatForm = document.getElementById("chatForm");
@@ -248,10 +250,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // 全部消す
       viewSearch.style.display = "none";
       viewList.style.display = "none";
+      viewList2.style.display = "none";
       viewChat.style.display = "none";
   
       if (name === "search") viewSearch.style.display = "block";
       if (name === "list") viewList.style.display = "block";
+      if (name === "list2") viewList2.style.display = "block"
       if (name === "chat") viewChat.style.display = "flex";
     }
   
@@ -290,8 +294,6 @@ document.addEventListener("DOMContentLoaded", () => {
           roomListEl.innerHTML = '<li class="muted">まだルームがありません。</li>';
           return;
       }
-
-
       rooms.forEach((room) => {
         const li = document.createElement("li");
         li.className = "room-item";
@@ -304,15 +306,13 @@ document.addEventListener("DOMContentLoaded", () => {
           chatRoomName.textContent = room.name;
           chatBody.innerHTML = `<div class="chat-msg chat-msg-other">${room.name} へようこそ！</div>`;
 
-  
-          
           showPanelView("chat");
           sidePanel.classList.add("chat-mode");
 
           window.location.href = `/chat/${currentRoomId}`;
 
-          socket.emit('join room', currentRoomId);
-          socket.emit('request history', currentRoomId);
+          // socket.emit('join room', currentRoomId);
+          // socket.emit('request history', currentRoomId);
         });
         roomListEl.appendChild(li);
       });
@@ -345,7 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const roomIdFromUrl = chatUrlMatch[1]; // URL에서 roomid 추출
             
             // 방금 불러온 rooms 목록에서 해당 ID를 찾습니다.
-            // (주의: room.id가 맞는지 확인. 서버가 'id'를 보낸다면 맞음)
             const roomToOpen = rooms.find(r => r.roomid === roomIdFromUrl); 
 
             if (roomToOpen) {
@@ -458,7 +457,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
      // ==========================
-    //  API 2: 룸 검색 기능 (✅ 신규 추가)
+    //  룸 검색 기능 (✅ 신규 추가)
     // ==========================
     if (searchBtn) {
         searchBtn.addEventListener("click", async () => {
@@ -510,6 +509,40 @@ document.addEventListener("DOMContentLoaded", () => {
   
 
 
+
+    //ルーム履歴
+    async function renderHistoryResults() {
+        try {
+                // 검색 API 호출
+              const response = await fetch(`/api/get-historyrooms`);
+              if (!response.ok) {
+                  throw new Error("fail to fetch" );
+              }
+              const rooms = await response.json();
+              rooms.forEach(room => {
+              const li = document.createElement("li");
+              li.className = "room-item";
+              li.innerHTML = `
+                  <div class="room-item-title">${room.roomName}</div>
+                  <div class="room-item-desc">${room.desc || ""}</div>
+              `;
+              li.addEventListener("click", () => {
+                // 클릭 시 페이지 이동 (리다이렉트)
+              window.location.href = `/chat/${room.roomId}`;
+            });
+            roomListE2.appendChild(li);
+            })
+            } catch (err) {
+                console.error(err);
+                roomListE2.innerHTML = '<li class="muted">検索エラーが発生しました。</li>';
+            }
+        // if (!rooms || rooms.length === 0) {
+        //     searchResultList.innerHTML = '<li class="muted">該当するルームが見つかりません。</li>';
+        //     return;
+        // }
+    }
+
+    renderHistoryResults();
     fetchAndRenderRooms();
 
     // ==========================
