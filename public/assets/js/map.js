@@ -65,6 +65,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const viewSearch = document.getElementById("view-search");
     const viewList = document.getElementById("view-list");
     const viewChat = document.getElementById("view-chat");
+
+    const searchInput = document.getElementById("searchInput");
+    const searchBtn = document.getElementById("searchBtn");
+    const searchResultList = document.getElementById("searchResultList"); 
   
     const roomListEl = document.getElementById("roomList");
     const chatRoomName = document.getElementById("chatRoomName");
@@ -449,6 +453,59 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         activePopup = null;
       });
+    }
+
+
+
+     // ==========================
+    //  API 2: 룸 검색 기능 (✅ 신규 추가)
+    // ==========================
+    if (searchBtn) {
+        searchBtn.addEventListener("click", async () => {
+            const keyword = searchInput.value.trim();
+            if (!keyword) {
+                alert("検索キーワードを入力してください。");
+                return;
+            }
+            
+            searchResultList.innerHTML = '<li class="muted">検索中...</li>';
+            
+            try {
+                // 검색 API 호출
+                const response = await fetch(`/api/search-rooms?q=${encodeURIComponent(keyword)}`);
+                if (!response.ok) {
+                    throw new Error("검색 실패");
+                }
+                const rooms = await response.json();
+                renderSearchResults(rooms); // 검색 결과 렌더링 함수 호출
+            } catch (err) {
+                console.error(err);
+                searchResultList.innerHTML = '<li class="muted">検索エラーが発生しました。</li>';
+            }
+        });
+    }
+
+    // 검색 결과 렌더링 (searchResultList)
+    function renderSearchResults(rooms) {
+        searchResultList.innerHTML = "";
+        if (!rooms || rooms.length === 0) {
+            searchResultList.innerHTML = '<li class="muted">該当するルームが見つかりません。</li>';
+            return;
+        }
+        
+        rooms.forEach(room => {
+            const li = document.createElement("li");
+            li.className = "room-item";
+            li.innerHTML = `
+                <div class="room-item-title">${room.name}</div>
+                <div class="room-item-desc">${room.description || ""}</div>
+            `;
+            li.addEventListener("click", () => {
+                // 클릭 시 페이지 이동 (리다이렉트)
+                window.location.href = `/chat/${room.roomid}`;
+            });
+            searchResultList.appendChild(li);
+        });
     }
   
 

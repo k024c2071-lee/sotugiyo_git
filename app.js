@@ -562,6 +562,39 @@ app.get('/api/get-rooms', async (req, res) => {
 });
 
 
+// --------------------------------------------------------------------------
+// ✅ API 3: 룸 검색 (신규 추가)
+// --------------------------------------------------------------------------
+app.get('/api/search-rooms', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).send("ログインが必要です。");
+    }
+    
+    const keyword = req.query.q; // ?q=검색어
+    if (!keyword) {
+        return res.status(400).send("検索キーワードを入力してください。");
+    }
+
+    try {
+        // 방(room_)이면서, 이름(name)에 키워드가 포함(CONTAINS)된 것 검색
+        const querySpec = {
+            query: "SELECT * FROM c WHERE STARTSWITH(c.roomid, 'room_') AND CONTAINS(c.name, @keyword)", 
+            parameters: [
+                { name: "@keyword", value: keyword }
+            ]
+        };
+
+        const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+        console.log(`検索キーワード: '${keyword}', 結果: ${rooms.length}건`);
+        res.status(200).json(rooms); // 검색 결과 반환
+
+    } catch (error) {
+        console.error("ルーム検索エラー:", error);
+        res.status(500).send("検索中にサーバーエラーが発生しました。");
+    }
+});
+
+
 
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
