@@ -543,13 +543,15 @@ io.on('connection', (socket) => {
 
 const roomsContainer = chartsdatabase.container("charts");
 
+
+MAX_INVITEES = 10;
 app.post('/api/create-room', async (req, res) => {
     if (!req.session.user) {
         return res.status(401).send("ログインが必要です。");
     }
 
     const { name, description, isPublic, password, lng, lat } = req.body;
-    const { username: creatorName, id: creatorId } = req.session.user;
+    const { username: creatorName, id: creatorId, email:creatorEmail } = req.session.user;
 
     if (!name || lng === undefined || lat === undefined) {
         return res.status(400).send("ルーム名と座標は必須です。");
@@ -581,21 +583,113 @@ app.post('/api/create-room', async (req, res) => {
     };
 
 
+
+
     try {
+        let creatorLocationGeoJson = null;
+
+        // 1. 作成者の位置情報取得とチェック
+        const { resource: creatorData } = await usersContainer.item(creatorId, creatorEmail).read();
+        if (!creatorData || !creatorData.locationGeoJson) {
+            // 🚩 FIX: creatorUsername -> creatorName に修正
+            console.warn(`ユーザ ${creatorName} の位置情報が登録されていません。`);
+            return res.status(400).send("チャットルームを作成するには、まずプロフィールで位置情報（郵便番号）を登録してください。");
+        }
+        creatorLocationGeoJson = creatorData.locationGeoJson;
+
+        // 2. 新しいルーム文書の作成
+        const roomId = `room_${new Date().getTime()}`;
+        const newRoom = {
+            roomid: roomId,
+            name,
+            description,
+            isPublic,
+            // パスワードは非公開の場合のみハッシュ化
+            password: isPublic ? null : await bcrypt.hash(password, 10), 
+            creatorId,
+            creatorName,
+            createdAt: new Date(),
+            location: {
+                type: "Point",
+                coordinates: [parseFloat(lng), parseFloat(lat)] // [経度, 緯度]
+            }
+        };
+        
+        // 3. 周辺ユーザーの検索 (100km 半径)
+        const radiusInMeters = 100000;
+        const querySpec = {
+            query: "SELECT c.id, c.username, c.email FROM c WHERE ST_DISTANCE(c.locationGeoJson, @creatorLocation) <= @radius AND c.id != @creatorId",
+            parameters: [
+                { name: "@creatorLocation", value: creatorLocationGeoJson },
+                { name: "@radius", value: radiusInMeters },
+                { name: "@creatorId", value: creatorId }
+            ]
+        };
+
+        const { resources: allNearbyUsers } = await usersContainer.items.query(querySpec).fetchAll();
+        // 🚩 FIX: creatorUsername -> creatorName に修正
+        console.log(`[チャットルーム生成] ${creatorName} 周り ${radiusInMeters / 1000}km 内のユーザ ${allNearbyUsers.length}人発見`);
+
+        // 4. 人数制限およびランダム選択
+        let usersToInvite = allNearbyUsers; 
+        if (allNearbyUsers.length > MAX_INVITEES) {
+            console.log(`[人数制限] ${allNearbyUsers.length}の中 ${MAX_INVITEES}人だけ招待します。ランダムに選択中...`);
+            // 配列をランダムにシャッフル (Fisher-Yates Shuffle)
+            for (let i = usersToInvite.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [usersToInvite[i], usersToInvite[j]] = [usersToInvite[j], usersToInvite[i]]; 
+            }
+            // MAX_INVITEES だけ切り出す
+            usersToInvite = usersToInvite.slice(0, MAX_INVITEES);
+        }
+
+        // 5. DB にルーム文書を作成
         const { resource: createdRoom } = await roomsContainer.items.create(newRoom);
-        // チャットルーム履歴に残せるため
-        await chatsContainer.items.create(chatMessage);
         console.log(`[ルーム作成] ${creatorName}が新しいルームを作成: ${name}`);
         
-        // (중요) 방을 만들었으면, 방 목록을 모든 클라이언트에게 갱신하라고 알립니다.
-        io.emit('rooms updated'); // 모든 접속자에게 알림
+        // 6. DB に最初のメッセージを保存 (チャットルーム履歴用)
+        const chatMessage = {
+            roomId : newRoom.roomid,
+            roomName : name,
+            sender : creatorName,
+            message : "チャットルームが作られました！",
+            timestamp: new Date()
+        };
+        await chatsContainer.items.create(chatMessage);
         
+        // 7. キャッシュにルーム名を追加
+        roomCache[createdRoom.roomid] = createdRoom.name;
+
+        // 8. 選択されたユーザーに招待メールを送信
+        if (usersToInvite.length > 0) {
+            console.log(`メールを ${usersToInvite.length}人に ${roomId}で (最大 ${MAX_INVITEES}人)`);
+            await Promise.all(usersToInvite.map(user =>
+                // 🚩 FIX: creatorUsername -> creatorName に修正
+                sendInvitationEmail(user.email, roomId, creatorName)
+            ));
+            console.log(`メール送信が完了しました。`);
+        } else {
+            console.log(`招待できるユーザーが見つかりませんでした。`);
+        }
+
+        // 9. Socket.io で全クライアントにルームリスト更新を通知
+        io.emit('rooms updated'); 
+        
+        // // 10. 🚩 CRITICAL FIX: 最後に一度だけリダイレクト応答を返して実行を終了
+        // return res.redirect(`/chat/${roomId}`);
         res.status(201).json(createdRoom); // 생성된 룸 정보 반환
     } catch (error) {
-        console.error("ルームのDB保存エラー:", error);
-        res.status(500).send("ルーム作成中にエラーが発生しました。");
+        console.error("チャットルーム生成エラー (catch):", error);
+        
+        // 11. [CRITICAL FIX] ヘッダーが送信されていない場合のみエラー応答を返します
+        if (!res.headersSent) {
+            return res.status(500).send("チャットルームの作成中にサーバーエラーが発生しました。");
+        }
+        // ヘッダーが送信済みの場合はエラーをログに出力するだけ
+        console.warn("ヘッダーはすでに送信されていますが、非同期エラーが発生しました。", error.code);
     }
 });
+
 
 
 
@@ -628,11 +722,11 @@ app.get('/api/get-historyrooms', async (req, res) => {
     try {
         // 모든 룸 정보를 가져옵니다 (필요시 쿼리 최적화)
         const querySpec = {
-                query: "SELECT * FROM c WHERE STARTSWITH(c.roomId, 'room_') AND c.sender = @email ORDER BY c.timestamp DESC OFFSET 0 LIMIT 50",
-                parameters: [{ name: "@email", value: req.session.user.email }]
+                query: "SELECT DISTINCT c.roomId, c.roomName FROM c WHERE STARTSWITH(c.roomId, 'room_') AND c.sender = @username ORDER BY c.timestamp DESC OFFSET 0 LIMIT 50",
+                parameters: [{ name: "@username", value: req.session.user.username }]
         };
         const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
-         console.log(`${req.session.user.email}session mail---------------------------`);
+         console.log(`${req.session.user.username}session username---------------------------`);
         res.status(200).json(rooms);
     } catch (error) {
         console.error("ルーム履歴の取得エラー:", error);
