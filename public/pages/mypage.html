@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>CHATRA｜マイページ</title>
+  <link rel="stylesheet" href="/public/assets/css/pages/mypage.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header class="topbar">
+    <div class="logo">CHATRA</div>
+    <div class="top-actions">
+      <span class="username">ようこそ、Userさん</span>
+      <button class="outline-btn">ログアウト</button>
+    </div>
+  </header>
+
+  <div class="mypage-layout">
+
+    <!-- 左側：プロフィール -->
+    <aside class="profile-panel">
+
+      <div class="profile-card">
+        <div class="avatar">
+          <span id="display-avatar-initial">U</span>
+        </div>
+        <h2 class="profile-name" id="display-name">User Name</h2>
+        <p class="profile-mail" id="display-email">user@example.com</p>
+
+        <button class="primary-btn w-100" id="open-profile-edit">
+          プロフィール編集
+        </button>
+      </div>
+
+      <div class="small-card">
+        <h3 class="small-title">基本情報</h3>
+        <p id="display-base">拠点：</p>
+        <p id="display-interests">興味：</p>
+      </div>
+
+      <div class="small-card">
+        <h3 class="small-title">設定</h3>
+        <ul class="setting-list">
+          <li id="display-notification">通知設定</li>
+          <li id="display-theme">テーマ：ライト</li>
+          <li>アカウント</li>
+        </ul>
+      </div>
+
+    </aside>
+
+    <!-- 右側：メイン -->
+    <main class="main-panel">
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>今参加しているチャットルーム</h2>
+          <a href="#" class="link-sm">すべて見る</a>
+        </div>
+
+        <div class="card-grid">
+          <article class="room-card">
+            <h3>伊香保温泉トーク</h3>
+            <p class="room-meta">参加者 12人 ・ 最終更新 2025/11/10</p>
+            <p class="room-desc">伊香保のおすすめスポット共有ルーム。</p>
+          </article>
+
+          <article class="room-card">
+            <h3>埼玉観光まとめ</h3>
+            <p class="room-meta">参加者 8人 ・ 最終更新 2025/11/08</p>
+            <p class="room-desc">川越・秩父・長瀞の話題中心。</p>
+          </article>
+
+          <article class="room-card">
+            <h3>関東日帰りスポット</h3>
+            <p class="room-meta">参加者 21人 ・ 最終更新 2025/11/07</p>
+            <p class="room-desc">週末のお出かけ候補を雑談。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>最近チャットしたチャットルーム</h2>
+          <a href="#" class="link-sm">履歴をすべて見る</a>
+        </div>
+
+        <div class="list-block">
+          <div class="list-item">
+            <div>
+              <h3>北海道グルメ旅</h3>
+              <p class="room-meta">直近の発言：2分前</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+          <div class="list-item">
+            <div>
+              <h3>京都・奈良 寺社好き</h3>
+              <p class="room-meta">直近の発言：1時間前</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+          <div class="list-item">
+            <div>
+              <h3>温泉天国・箱根</h3>
+              <p class="room-meta">直近の発言：昨日</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+          <div class="list-item">
+            <div>
+              <h3>東北ドライブ計画</h3>
+              <p class="room-meta">直近の発言：3日前</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ▼ プロフィール編集モーダル ▼ -->
+  <div class="profile-edit-overlay is-hidden" id="profile-edit-modal">
+
+    <div class="profile-edit-dialog">
+
+      <header class="profile-edit-header">
+        <h2>プロフィール編集</h2>
+        <button class="icon-btn" id="close-profile-edit">×</button>
+      </header>
+
+      <div class="profile-edit-body">
+
+        <!-- アイコン -->
+        <div class="profile-edit-avatar">
+          <div class="avatar large">
+            <span id="edit-avatar-initial">U</span>
+          </div>
+        </div>
+
+        <!-- 入力フォーム -->
+        <form class="profile-edit-form" id="profile-edit-form">
+
+          <div class="form-row">
+            <label for="edit-name">ユーザー名</label>
+            <input id="edit-name" type="text">
+          </div>
+
+          <div class="form-row">
+            <label for="edit-email">メールアドレス</label>
+            <input id="edit-email" type="email">
+          </div>
+
+          <div class="form-row two-cols">
+            <div>
+              <label for="edit-base">拠点</label>
+              <select id="edit-base">
+                <option>東北（北海道）地方</option>
+                <option>関東地方</option>
+                <option>中部地方</option>
+                <option>近畿地方</option>
+                <option>中国地方</option>
+                <option>四国地方</option>
+                <option>九州（沖縄）地方</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="edit-theme">テーマ</label>
+              <select id="edit-theme">
+                <option>ライト</option>
+                <option>ダーク</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label for="edit-interests">興味・ジャンル</label>
+            <input id="edit-interests" type="text">
+          </div>
+
+          <div class="profile-edit-footer">
+            <button class="outline-btn" type="button" id="cancel-profile-edit">キャンセル</button>
+            <button class="primary-btn" type="submit">保存する</button>
+          </div>
+
+        </form>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- JS -->
+  <script src="/public/assets/js/mypage.js"></script>
+
+</body>
+</html>
