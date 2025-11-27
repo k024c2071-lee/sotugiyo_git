@@ -9,17 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================
     const STYLE_URL = "https://tile.openstreetmap.jp/styles/osm-bright-ja/style.json";
     const JP_BOUNDS = [[121.5, 19.5], [153.5, 47.5]];
-  
-    // const map = new maplibregl.Map({
-    //   container: "map",
-    //   style: STYLE_URL,
-    //   center: [138.25, 36.2],
-    //   zoom: 5,
-    //   maxZoom: 22,
-    //   maxBounds: JP_BOUNDS,
-    //   dragRotate: false,
-    //   pitchWithRotate: false,
-    // });
 
 
     try {
@@ -86,6 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeModalBtn = document.getElementById("closeModal");
     const cancelBtn = document.getElementById("cancelBtn");
     const roomForm = document.getElementById("roomForm");
+    const submitBtn = document.getElementById("submitBtn");
     const roomPublic = document.getElementById("roomPublic");
     const pwRow = document.getElementById("pwRow");
     const roomPassword = document.getElementById("roomPassword");
@@ -170,6 +160,9 @@ document.addEventListener("DOMContentLoaded", () => {
   
     roomForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '作成中...お待ちください';
   
       const payload = {
         name: document.getElementById("roomName").value.trim(),
@@ -220,11 +213,20 @@ document.addEventListener("DOMContentLoaded", () => {
           } else {
               const errorText = await response.text();
               alert(`ルーム作成失敗: ${errorText}`);
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalButtonText;
           }
       } catch (error) {
           console.error("ルーム作成APIエラー:", error);
           alert("ルーム作成中にネットワークエラーが発生しました。");
-      }
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalButtonText;
+      } finally {
+        // 3. 処理が完了したら、ボタンを有効に戻す
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalButtonText;
+    }
+
     });
 
       // console.log("✅ ルーム作成データ", payload);
@@ -277,16 +279,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   
-    // ==========================
-    //  ルーム一覧・チャット（ダミー）
-    // ==========================
-
-    // const DUMMY_ROOMS = [
-    //   { id: 1, name: "東京・観光情報交換ルーム", desc: "浅草・渋谷・新宿" },
-    //   { id: 2, name: "沖縄ダイビング仲間募集", desc: "那覇・慶良間" },
-    //   { id: 3, name: "北海道グルメ", desc: "札幌・小樽・函館" },
-    //   { id: 4, name: "埼玉：四季彩ルート", desc: "長瀞・秩父" },
-    // ];
   
     function renderRoomList(rooms) {
       roomListEl.innerHTML = "";
@@ -299,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
         li.className = "room-item";
         li.innerHTML = `
           <div class="room-item-title">${room.name}</div>
-          <div class="room-item-desc">${room.desc || ""}</div>
+          <div class="room-item-desc">${room.description || ""}</div>
         `;
         li.addEventListener("click", () => {
           currentRoomId = room.roomid; // ✅ 現在のルームIDを更新
