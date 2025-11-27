@@ -52,5 +52,20 @@
   </body>
   </html>
   
+  <script>
+    // パスワード表示切り替えのスクリプト (もし必要であれば)
+    document.querySelectorAll('.pw-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const input = button.previousElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '非表示';
+            } else {
+                input.type = 'password';
+                button.textContent = '表示';
+            }
+        });
+    });
+  </script>
 </body>
 </html>
