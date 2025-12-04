@@ -82,20 +82,20 @@
   </main>
 
   <script>
-    function searchPostalCode() {
-      // ここに郵便番号検索APIとの連携ロジックを実装します
-      const postalCode = document.getElementById('postal-code').value;
-      if (postalCode) {
-        alert(postalCode + "の住所を検索します。（実装が必要です）");
-        // 例: fetch APIを使って日本の郵便番号API (zipcloudなど) を呼び出し、
-        // 結果を address1 フィールドに自動入力するなど
-      } else {
-        alert("郵便番号を入力してください。");
-      }
-    }
+    // function searchPostalCode() {
+    //   // ここに郵便番号検索APIとの連携ロジックを実装します
+    //   const postalCode = document.getElementById('postal-code').value;
+    //   if (postalCode) {
+    //     alert(postalCode + "の住所を検索します。（実装が必要です）");
+    //     // 例: fetch APIを使って日本の郵便番号API (zipcloudなど) を呼び出し、
+    //     // 結果を address1 フィールドに自動入力するなど
+    //   } else {
+    //     alert("郵便番号を入力してください。");
+    //   }
+    // }
 
 
-    async function searchPostalCode() {
+  async function searchPostalCode() {
   const postalCodeInput = document.getElementById('postal-code');
   const address1Input = document.getElementById('address1');
   const postalCode = postalCodeInput.value;

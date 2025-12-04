@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>CHATRA｜マイページ</title>
-  <link rel="stylesheet" href="/public/assets/css/pages/mypage.css">
+  <link rel="stylesheet" href="/assets/css/pages/mypage.css">
+  <link rel="stylesheet" href="/assets/css/pages/signup.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
@@ -12,7 +13,7 @@
   <header class="topbar">
     <div class="logo">CHATRA</div>
     <div class="top-actions">
-      <span class="username">ようこそ、Userさん</span>
+      <span class="username" id = "username">ようこそ、Userさん</span>
       <button class="outline-btn">ログアウト</button>
     </div>
   </header>
@@ -36,17 +37,7 @@
 
       <div class="small-card">
         <h3 class="small-title">基本情報</h3>
-        <p id="display-base">拠点：</p>
-        <p id="display-interests">興味：</p>
-      </div>
-
-      <div class="small-card">
-        <h3 class="small-title">設定</h3>
-        <ul class="setting-list">
-          <li id="display-notification">通知設定</li>
-          <li id="display-theme">テーマ：ライト</li>
-          <li>アカウント</li>
-        </ul>
+        <p id="display-postal">郵便番号：</p>
       </div>
 
     </aside>
@@ -159,33 +150,34 @@
             <input id="edit-email" type="email">
           </div>
 
-          <div class="form-row two-cols">
-            <div>
-              <label for="edit-base">拠点</label>
-              <select id="edit-base">
-                <option>東北（北海道）地方</option>
-                <option>関東地方</option>
-                <option>中部地方</option>
-                <option>近畿地方</option>
-                <option>中国地方</option>
-                <option>四国地方</option>
-                <option>九州（沖縄）地方</option>
-              </select>
-            </div>
+            <fieldset class="address-group">
+              <legend>あなたの住所</legend>
 
-            <div>
-              <label for="edit-theme">テーマ</label>
-              <select id="edit-theme">
-                <option>ライト</option>
-                <option>ダーク</option>
-              </select>
-            </div>
-          </div>
+              <div class="form-row">
+                <label class="field postal-code-field">
+                    <span>郵便番号</span>
+                    <input type="text" id="postal-code" name="postalCode" placeholder="例：144-0052" required />
+                    <div class="input-with-button">
+                    <button type="button" onclick="searchPostalCode()">検索</button>
+                    </div>
+                </label>
+              </div>
 
-          <div class="form-row">
-            <label for="edit-interests">興味・ジャンル</label>
-            <input id="edit-interests" type="text">
-          </div>
+              <div class="form-row">
+                <label class="field">
+                    <span>都道府県・市区町村</span>
+                    <input type="text" id="address1" name="address1" placeholder="例：東京都大田区" required />
+                </label>
+              </div>
+
+              <div class="form-row">
+                <label class="field">
+                    <span>番地・建物名・部屋番号</span>
+                    <input type="text" id="address2" name="address2" placeholder="例：西蒲田５丁目２３−２２ マンション名 101号室" />
+                </label>
+              </div>
+            </fieldset>
+
 
           <div class="profile-edit-footer">
             <button class="outline-btn" type="button" id="cancel-profile-edit">キャンセル</button>
@@ -201,7 +193,7 @@
   </div>
 
   <!-- JS -->
-  <script src="/public/assets/js/mypage.js"></script>
+  <script src="/assets/js/mypage.js"></script>
 
 </body>
 </html>

@@ -413,7 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         chatBody.scrollTop = chatBody.scrollHeight; // 스크롤 맨 아래로
     });
-    
+
 
 
     // ✅ 新規追加: サーバーからルーム更新通知を受信

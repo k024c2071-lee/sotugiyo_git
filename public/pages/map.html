@@ -28,7 +28,8 @@
     <nav class="side-nav">
       <button class="side-item" data-view="search">🔍 ルーム検索</button>
       <button class="side-item" data-view="list">📋 ルーム一覧</button>
-      <button class="side-item" data-view="list2">📗 履歴</button>
+      <!-- <button class="side-item" data-view="list2">📗 履歴</button> -->
+      <button class="side-item" id = "mypageButton" data-view="mypage">📗 mypage</button>
     </nav>
 
     <div class="side-content">
@@ -122,6 +123,7 @@
   <!-- ✅ JS は外出し -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="/assets/js/map.js"></script>
+    <script src="/assets/js/mypage.js"></script>
 
     <script>
     const socket = io();

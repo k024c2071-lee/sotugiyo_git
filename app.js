@@ -31,7 +31,7 @@ const usersContainer = usersdatabase.container("users");
 
 
 app.post('/register', async (req, res) => {
-    const { email, password, username, location } = req.body;
+    const { email, password, username, address1, address2 } = req.body;
     const postalCode = req.body.postalCode;
 
     if (!postalCode) {
@@ -56,6 +56,8 @@ app.post('/register', async (req, res) => {
         password: hashedPassword,
         username,
         location: { postalCode: postalCode },
+        address1: address1,
+        address2: address2,
         locationGeoJson: centroidCoords ? {
         type: "Point",
         coordinates: [centroidCoords.longitude, centroidCoords.latitude] // [경도, 위도]
@@ -663,6 +665,356 @@ app.get('/api/search-rooms', async (req, res) => {
     }
 });
 
+
+app.get('/mypage', (req, res) => {
+    // 1. 세션에서 사용자 정보 확인
+    if (!req.session.user) {
+        // 로그인되어 있지 않다면 로그인 페이지로 리다이렉트
+        return res.redirect('/login');
+    }
+
+    const userData = req.session.user;
+
+    const mypageHtmlContent = generateMyPageHtml(userData);
+    res.send(mypageHtmlContent);
+});
+
+// 新しいエンドポイント: クライアント側でユーザー情報を取得するための API
+app.get('/api/user/profile', (req, res) => {
+    if (!req.session.user) {
+        // 認証されていない場合は 401 Unauthorized を返す
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // 세션에서 필요한 사용자 정보만 추출하여 JSON으로 반환
+    const userData = {
+        username: req.session.user.username || 'ゲストユーザー',
+        email: req.session.user.email || 'not-set@example.com',
+        location: req.session.user.location || {}, // 拠点情報
+    };
+
+    res.json(userData);
+});
+
+
+
+app.post('/api/user/profile/update', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { username, email, location, address1, address2 } = req.body;
+    const userId = req.session.user.id;
+    // Partition Key로서의 이메일 (변경 전)
+    const currentEmail = req.session.user.email; 
+
+    if (!username || !email) {
+        return res.status(400).json({ error: 'ユーザー名とメールアドレスは必須です。' });
+    }
+
+    try {
+        // 1. 현재 사용자 문서 가져오기
+        // 주의: 파티션 키가 이메일인 경우, 이메일을 변경하려면 문서를 삭제하고 새로 만들어야 합니다.
+        // 여기서는 안전을 위해 이메일은 변경되지 않았거나, 변경 시 파티션 키 제약을 고려하지 않는 단순 업데이트로 가정합니다.
+        // 만약 이메일이 파티션 키라면, 이메일 변경은 지원하지 않거나 복잡한 로직이 필요합니다.
+        
+        const { resource: userDoc } = await usersContainer.item(userId, currentEmail).read();
+
+        if (!userDoc) {
+            return res.status(404).json({ error: 'ユーザーが見つかりません。' });
+        }
+
+
+        // 2. 문서 업데이트
+        userDoc.username = username;
+        userDoc.email = email; // 이메일이 파티션 키가 아니거나 변경되지 않았다고 가정
+        userDoc.location = location;
+        userDoc.address1 = address1;
+        userDoc.address2 = address2;
+
+        // 3. DB 저장 (Replace)
+        // Partition Key가 변경되지 않았다는 전제하에 replace
+        await usersContainer.item(userId, currentEmail).replace(userDoc);
+
+        // 4. 세션 정보 업데이트
+        req.session.user.username = username;
+        req.session.user.email = email;
+        req.session.user.location = location;
+
+
+        // 세션 저장 (비동기)
+        req.session.save((err) => {
+            if (err) {
+                console.error("セッション保存エラー:", err);
+                return res.status(500).json({ error: 'セッションの更新に失敗しました。' });
+            }
+            res.json({ message: 'プロフィールを更新しました。', user: req.session.user });
+        });
+
+    } catch (error) {
+        console.error("プロフィール更新エラー:", error);
+        res.status(500).json({ error: 'プロフィールの更新中にエラーが発生しました。' });
+    }
+});
+
+
+function generateMyPageHtml(userData) {
+    // ユーザー名からアバターのイニシャルを取得
+    const initial = userData.username ? userData.username.charAt(0).toUpperCase() : 'U';
+
+    return `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>CHATRA｜マイページ</title>
+  <link rel="stylesheet" href="/assets/css/pages/mypage.css">
+  <link rel="stylesheet" href="/assets/css/pages/signup.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header class="topbar">
+    <div class="logo">CHATRA</div>
+    <div class="top-actions">
+      <span class="username" id="username">ようこそ、Userさん</span>
+      <button class="outline-btn">ログアウト</button>
+    </div>
+  </header>
+
+  <div class="mypage-layout">
+
+    <!-- 左側：プロフィール -->
+    <aside class="profile-panel">
+
+      <div class="profile-card">
+        <div class="avatar">
+          <span id="display-avatar-initial">U</span>
+        </div>
+        <h2 class="profile-name" id="display-name">User Name</h2>
+        <p class="profile-mail" id="display-email">user@example.com</p>
+
+        <button class="primary-btn w-100" id="open-profile-edit">
+          プロフィール編集
+        </button>
+      </div>
+
+      <div class="small-card">
+        <h3 class="small-title">基本情報</h3>
+        <p>
+            郵便番号：<span id="display-postal"></span>
+        </p>
+      </div>
+
+    </aside>
+
+    <!-- 右側：メイン -->
+    <main class="main-panel">
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>今参加しているチャットルーム</h2>
+          <a href="#" class="link-sm">すべて見る</a>
+        </div>
+
+        <div class="card-grid">
+          <article class="room-card">
+            <h3>伊香保温泉トーク</h3>
+            <p class="room-meta">参加者 12人 ・ 最終更新 2025/11/10</p>
+            <p class="room-desc">伊香保のおすすめスポット共有ルーム。</p>
+          </article>
+
+          <article class="room-card">
+            <h3>埼玉観光まとめ</h3>
+            <p class="room-meta">参加者 8人 ・ 最終更新 2025/11/08</p>
+            <p class="room-desc">川越・秩父・長瀞の話題中心。</p>
+          </article>
+
+          <article class="room-card">
+            <h3>関東日帰りスポット</h3>
+            <p class="room-meta">参加者 21人 ・ 最終更新 2025/11/07</p>
+            <p class="room-desc">週末のお出かけ候補を雑談。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>最近チャットしたチャットルーム</h2>
+          <a href="#" class="link-sm">履歴をすべて見る</a>
+        </div>
+
+        <div class="list-block">
+          <div class="list-item">
+            <div>
+              <h3>北海道グルメ旅</h3>
+              <p class="room-meta">直近の発言：2分前</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+          <div class="list-item">
+            <div>
+              <h3>京都・奈良 寺社好き</h3>
+              <p class="room-meta">直近の発言：1時間前</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+          <div class="list-item">
+            <div>
+              <h3>温泉天国・箱根</h3>
+              <p class="room-meta">直近の発言：昨日</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+          <div class="list-item">
+            <div>
+              <h3>東北ドライブ計画</h3>
+              <p class="room-meta">直近の発言：3日前</p>
+            </div>
+            <button class="outline-btn sm">開く</button>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ▼ プロフィール編集モーダル ▼ -->
+  <div class="profile-edit-overlay is-hidden" id="profile-edit-modal">
+
+    <div class="profile-edit-dialog">
+
+      <header class="profile-edit-header">
+        <h2>プロフィール編集</h2>
+        <button class="icon-btn" id="close-profile-edit">×</button>
+      </header>
+
+      <div class="profile-edit-body">
+
+        <!-- アイコン -->
+        <div class="profile-edit-avatar">
+          <div class="avatar large">
+            <span id="edit-avatar-initial">U</span>
+          </div>
+        </div>
+
+        <!-- 入力フォーム -->
+        <form class="profile-edit-form" id="profile-edit-form">
+
+          <div class="form-row">
+            <label for="edit-name">ユーザー名</label>
+            <input id="edit-name" type="text">
+          </div>
+
+          <div class="form-row">
+            <label for="edit-email">メールアドレス</label>
+            <input id="edit-email" type="email">
+          </div>
+
+            <fieldset class="address-group">
+              <legend>あなたの住所</legend>
+
+              <div class="form-row">
+                <label class="field postal-code-field">
+                    <span>郵便番号</span>
+                    <input type="text" id="postal-code" name="postalCode" placeholder="例：144-0052" required />
+                    <div class="input-with-button">
+                    <button type="button" onclick="searchPostalCode()">検索</button>
+                    </div>
+                </label>
+              </div>
+
+              <div class="form-row">
+                <label class="field">
+                    <span>都道府県・市区町村</span>
+                    <input type="text" id="address1" name="address1" placeholder="例：東京都大田区" required />
+                </label>
+              </div>
+
+              <div class="form-row">
+                <label class="field">
+                    <span>番地・建物名・部屋番号</span>
+                    <input type="text" id="address2" name="address2" placeholder="例：西蒲田５丁目２３−２２ マンション名 101号室" />
+                </label>
+              </div>
+            </fieldset>
+
+
+          <div class="profile-edit-footer">
+            <button class="outline-btn" type="button" id="cancel-profile-edit">キャンセル</button>
+            <button class="primary-btn" type="submit">保存する</button>
+          </div>
+
+        </form>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- JS -->
+  <script src="/assets/js/mypage.js"></script>
+
+
+  
+    <script>
+
+
+  async function searchPostalCode() {
+  const postalCodeInput = document.getElementById('postal-code');
+  const address1Input = document.getElementById('address1');
+  const postalCode = postalCodeInput.value;
+
+  if (!postalCode) {
+    alert("郵便番号を入力してください。");
+    return;
+  }
+
+  // zipcloud API URL 생성 (하이픈(-) 제거 필요)
+   const apiUrl = "https://zipcloud.ibsnet.co.jp/api/search?zipcode=" + postalCode.replace(/-/g, '');
+
+  try {
+    // fetch API를 사용해 zipcloud 서버에 GET 요청
+    const response = await fetch(apiUrl);
+    const data = await response.json(); // 응답을 JSON 형태로 파싱
+
+    // API 응답 상태 확인
+    if (data.status === 200 && data.results) {
+      // 성공적으로 주소를 찾았을 경우
+      const result = data.results[0];
+      // 주소 조합 (都道府県 + 市区町村 + 町域名)
+      const fullAddress = result.address1 + result.address2 + result.address3;
+      address1Input.value = fullAddress; // address1 필드에 자동 입력
+    } else if (data.status === 400 || data.status === 500) {
+      // 우편번호 형식이 잘못되었거나, 해당 주소가 없을 경우
+       alert("住所が見つかりませんでした: " + data.message);
+      address1Input.value = ''; // 필드 비우기
+    } else {
+      alert("予期せぬエラーが発生しました。");
+      address1Input.value = '';
+    }
+  } catch (error) {
+    console.error("郵便番号APIの呼び出し中にエラーが発生しました:", error);
+    alert("住所の検索中にネットワークエラーが発生しました。");
+    address1Input.value = '';
+  }
+}
+
+
+    </script>
+  
+
+</body>
+</html>
+    `;
+}
 
 
 server.listen(PORT, () => {
