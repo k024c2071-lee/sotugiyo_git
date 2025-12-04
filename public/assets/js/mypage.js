@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("profile-edit-form");
     const mypageButton = document.getElementById('mypageButton');
 
+    const createdRoomsList = document.getElementById("created-rooms-list");
+    const joinedRoomsList = document.getElementById("joined-rooms-list");
+
     /* --------------------
         データ取得と表示
     -------------------- */
@@ -33,6 +36,94 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+
+
+     // 🚀 [추가] 내가 만든 룸 가져오기
+    async function fetchCreatedRooms() {
+        try {
+            const response = await fetch('/api/user/created-rooms');
+            if (!response.ok) throw new Error('Created rooms load failed');
+            const rooms = await response.json();
+            renderCreatedRooms(rooms);
+        } catch (error) {
+            console.error(error);
+            if(createdRoomsList) createdRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
+        }
+    }
+
+    // 🚀 [추가] 참여한 룸 가져오기
+    async function fetchJoinedRooms() {
+        try {
+            const response = await fetch('/api/user/joined-rooms');
+            if (!response.ok) throw new Error('Joined rooms load failed');
+            const rooms = await response.json();
+            renderJoinedRooms(rooms);
+        } catch (error) {
+            console.error(error);
+            if(joinedRoomsList) joinedRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
+        }
+    }
+
+
+
+    // 🚀 [추가] 내가 만든 룸 렌더링
+    function renderCreatedRooms(rooms) {
+        if (!createdRoomsList) return;
+        createdRoomsList.innerHTML = ""; // 초기화
+
+        if (rooms.length === 0) {
+            createdRoomsList.innerHTML = '<p class="muted">作成したルームはありません。</p>';
+            return;
+        }
+
+        rooms.forEach(room => {
+            const date = new Date(room.createdAt).toLocaleDateString('ja-JP');
+            const html = `
+                <article class="room-card" onclick="window.location.href='/chat/${room.roomid}'" style="cursor:pointer">
+                    <h3>${room.name}</h3>
+                    <p class="room-meta">作成日: ${date}</p>
+                    <p class="room-desc">${room.description || '説明なし'}</p>
+                </article>
+            `;
+            createdRoomsList.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    // 🚀 [추가] 참여한 룸 렌더링
+    function renderJoinedRooms(rooms) {
+        if (!joinedRoomsList) return;
+        joinedRoomsList.innerHTML = "";
+
+        if (rooms.length === 0) {
+            joinedRoomsList.innerHTML = '<p class="muted">履歴がありません。</p>';
+            return;
+        }
+
+        rooms.forEach(room => {
+            // timestamp 파싱
+            const date = new Date(room.lastActive);
+            // 날짜 포맷 (예: 11/24 14:30)
+            const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+            const html = `
+                <div class="list-item">
+                    <div>
+                        <h3>${room.name}</h3>
+                        <p class="room-meta">直近の発言：${dateStr}</p>
+                    </div>
+                    <button class="outline-btn sm" onclick="window.location.href='/chat/${room.roomid}'">開く</button>
+                </div>
+            `;
+            joinedRoomsList.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    // 초기 실행: 모든 데이터 가져오기
+    fetchUserData();
+    fetchCreatedRooms();
+    fetchJoinedRooms();
+
+
     /**
      * 取得したユーザーデータを画面上の要素に反映する
      * @param {object} userData - ユーザー情報オブジェクト
@@ -58,8 +149,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     }
 
-    // ページ読み込み時にデータ取得を開始
-    fetchUserData();
 
 
     /* --------------------

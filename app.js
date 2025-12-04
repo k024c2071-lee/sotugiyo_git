@@ -235,7 +235,7 @@ app.get('/logout', (req, res) => {
       return res.status(500).send('ログアウトに失敗しました。');
     }
     // 세션 삭제 후 로그인 페이지로 리디렉션
-    res.redirect('/login.html');
+    res.redirect('../main.html');
   });
 });
 
@@ -451,32 +451,6 @@ app.post('/api/create-room', async (req, res) => {
         return res.status(400).send("ルーム名と座標は必須です。");
     }
 
-    // const newRoom = {
-    //     // Cosmos DB는 id를 자동으로 생성하지 않으므로 직접 만듭니다.
-    //     roomid: `room_${new Date().getTime()}`,
-    //     name,
-    //     description,
-    //     isPublic,
-    //     password: isPublic ? null : await bcrypt.hash(password, 10), // 비공개일 경우 암호화
-    //     creatorId,
-    //     creatorName,
-    //     createdAt: new Date(),
-    //     // GeoJSON 형식으로 좌표 저장 (지도 표기용)
-    //     location: {
-    //         type: "Point",
-    //         coordinates: [parseFloat(lng), parseFloat(lat)] // [경도, 위도]
-    //     }
-    // };
-
-    // const chatMessage = {
-    //     roomId : newRoom.roomid,
-    //     roomName : name,
-    //     sender : creatorName,
-    //     message : "チャットルームが作られました！",
-    //     timestamp: new Date()
-    // };
-
-
 
 
     try {
@@ -533,7 +507,7 @@ app.post('/api/create-room', async (req, res) => {
             createdAt: new Date(),
             // 💡 新しいフィールド: 招待ユーザーのIDと名前をリスト化して格納
             invitedUsers: usersToInvite.map(user => ({
-                id: user.id,
+                email: user.email,
                 username: user.username
             })),
             location: {
@@ -779,7 +753,7 @@ function generateMyPageHtml(userData) {
     <div class="logo">CHATRA</div>
     <div class="top-actions">
       <span class="username" id="username">ようこそ、Userさん</span>
-      <button class="outline-btn">ログアウト</button>
+      <button class="outline-btn" onclick="location.href='/logout'">ログアウト</button>
     </div>
   </header>
 
@@ -814,28 +788,12 @@ function generateMyPageHtml(userData) {
 
       <section class="section-block">
         <div class="section-head">
-          <h2>今参加しているチャットルーム</h2>
+          <h2>作ったチャットルーム</h2>
           <a href="#" class="link-sm">すべて見る</a>
         </div>
 
-        <div class="card-grid">
-          <article class="room-card">
-            <h3>伊香保温泉トーク</h3>
-            <p class="room-meta">参加者 12人 ・ 最終更新 2025/11/10</p>
-            <p class="room-desc">伊香保のおすすめスポット共有ルーム。</p>
-          </article>
-
-          <article class="room-card">
-            <h3>埼玉観光まとめ</h3>
-            <p class="room-meta">参加者 8人 ・ 最終更新 2025/11/08</p>
-            <p class="room-desc">川越・秩父・長瀞の話題中心。</p>
-          </article>
-
-          <article class="room-card">
-            <h3>関東日帰りスポット</h3>
-            <p class="room-meta">参加者 21人 ・ 最終更新 2025/11/07</p>
-            <p class="room-desc">週末のお出かけ候補を雑談。</p>
-          </article>
+        <div class="card-grid" id="created-rooms-list">
+            <p class="muted">読み込み中...</p>
         </div>
       </section>
 
@@ -845,39 +803,8 @@ function generateMyPageHtml(userData) {
           <a href="#" class="link-sm">履歴をすべて見る</a>
         </div>
 
-        <div class="list-block">
-          <div class="list-item">
-            <div>
-              <h3>北海道グルメ旅</h3>
-              <p class="room-meta">直近の発言：2分前</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
-          <div class="list-item">
-            <div>
-              <h3>京都・奈良 寺社好き</h3>
-              <p class="room-meta">直近の発言：1時間前</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
-          <div class="list-item">
-            <div>
-              <h3>温泉天国・箱根</h3>
-              <p class="room-meta">直近の発言：昨日</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
-          <div class="list-item">
-            <div>
-              <h3>東北ドライブ計画</h3>
-              <p class="room-meta">直近の発言：3日前</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
+        <div class="list-block" id="joined-rooms-list">
+            <p class="muted">読み込み中...</p>
         </div>
       </section>
 
@@ -1015,6 +942,66 @@ function generateMyPageHtml(userData) {
 </html>
     `;
 }
+
+// --------------------------------------------------------------------------
+// 🚀 API: 自分が作ったルーム一覧
+// --------------------------------------------------------------------------
+app.get('/api/user/created-rooms', async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    try {
+        // creatorId が自分の ID であるルームを検索
+        const querySpec = {
+            query: "SELECT * FROM c WHERE STARTSWITH(c.roomid, 'room_') AND c.creatorId = @userId ORDER BY c.createdAt DESC",
+            parameters: [{ name: "@userId", value: req.session.user.id }]
+        };
+        const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+        res.json(rooms);
+    } catch (error) {
+        console.error("Created rooms fetch error:", error);
+        res.status(500).json({ error: 'Error fetching created rooms' });
+    }
+});
+
+
+// --------------------------------------------------------------------------
+// 🚀 API: 自分が参加（発言）したルーム一覧
+// --------------------------------------------------------------------------
+app.get('/api/user/joined-rooms', async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    try {
+        // メッセージ履歴から自分が送信したものを検索 (最新100件)
+        const querySpec = {
+            query: "SELECT c.roomId, c.roomName, c.timestamp FROM c WHERE c.sender = @username ORDER BY c.timestamp DESC OFFSET 0 LIMIT 100",
+            parameters: [{ name: "@username", value: req.session.user.username }]
+        };
+        const { resources: messages } = await chatsContainer.items.query(querySpec).fetchAll();
+
+        // JS側で重複を除去 (roomId基準)
+        const uniqueRooms = [];
+        const seenRoomIds = new Set();
+
+        for (const msg of messages) {
+            if (!seenRoomIds.has(msg.roomId)) {
+                seenRoomIds.add(msg.roomId);
+                // 必要なデータだけ抽出
+                uniqueRooms.push({
+                    roomid: msg.roomId,
+                    name: msg.roomName || '名称未設定', // メッセージにroomNameが含まれている前提
+                    lastActive: msg.timestamp
+                });
+            }
+        }
+
+        res.json(uniqueRooms.slice(0, 10)); // 最新10件のみ返す
+
+    } catch (error) {
+        console.error("Joined rooms fetch error:", error);
+        res.status(500).json({ error: 'Error fetching joined rooms' });
+    }
+});
+
 
 
 server.listen(PORT, () => {
