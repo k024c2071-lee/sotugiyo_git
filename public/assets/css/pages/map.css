@@ -195,3 +195,29 @@ textarea{ resize: vertical; }
 .maplibregl-popup-close-button:hover {
   background: #f3f4f6;
 }
+/* 슬라이더 스타일 */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0; /* 초기 배경색 (JS로 그라데이션 덮어씌움) */
+    border-radius: 5px;
+    outline: none;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    transition: transform 0.1s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}

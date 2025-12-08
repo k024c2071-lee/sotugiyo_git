@@ -81,6 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const roomPassword = document.getElementById("roomPassword");
     const roomLng = document.getElementById("roomLng");
     const roomLat = document.getElementById("roomLat");
+    const roomRadiusInput = document.getElementById("roomRadius"); // [추가] 슬라이더
+    const radiusValueSpan = document.getElementById("radiusValue"); // [추가] 숫자 표시
 
     
   
@@ -132,6 +134,28 @@ document.addEventListener("DOMContentLoaded", () => {
         ],
       };
     }
+
+
+
+    function updateSliderUI() {
+        const val = roomRadiusInput.value;
+        const min = roomRadiusInput.min;
+        const max = roomRadiusInput.max;
+        
+        // 텍스트 업데이트
+        radiusValueSpan.textContent = val;
+
+        // 배경 그라데이션 업데이트 (파란색 채우기)
+        const percentage = ((val - min) / (max - min)) * 100;
+        roomRadiusInput.style.background = `linear-gradient(to right, #007bff 0%, #007bff ${percentage}%, #e0e0e0 ${percentage}%, #e0e0e0 100%)`;
+    }
+
+    // 슬라이더 이벤트 리스너 등록
+    if (roomRadiusInput) {
+        roomRadiusInput.addEventListener('input', updateSliderUI);
+        updateSliderUI(); // 초기화 시 한 번 실행
+    }
+
   
     // ==========================
     //  モーダル（部屋作成）
@@ -150,6 +174,23 @@ document.addEventListener("DOMContentLoaded", () => {
       roomForm.reset();
       pwRow.style.display = "none";
       roomPassword.value = "";
+    }
+
+        // ==========================
+    //  모달 제어 수정 (초기화 로직 추가)
+    // ==========================
+    function closeRoomModal() {
+        modal.classList.remove("active");
+        backdrop.classList.remove("active");
+        roomForm.reset();
+        pwRow.style.display = "none";
+        roomPassword.value = "";
+        
+        // [추가] 슬라이더 초기값(10km)으로 리셋
+        if(roomRadiusInput) {
+            roomRadiusInput.value = 10; 
+            updateSliderUI();
+        }
     }
   
     roomPublic.addEventListener("change", () => {
@@ -171,6 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
         password: roomPublic.checked ? "" : roomPassword.value,
         lng: parseFloat(roomLng.value),
         lat: parseFloat(roomLat.value),
+        distance: parseInt(roomRadiusInput.value, 10)
       };
   
       if (!payload.name) {

@@ -444,7 +444,7 @@ app.post('/api/create-room', async (req, res) => {
         return res.status(401).send("ログインが必要です。");
     }
 
-    const { name, description, isPublic, password, lng, lat } = req.body;
+    const { name, description, isPublic, password, lng, lat, distance } = req.body;
     const { username: creatorName, id: creatorId, email:creatorEmail } = req.session.user;
 
     if (!name || lng === undefined || lat === undefined) {
@@ -464,9 +464,15 @@ app.post('/api/create-room', async (req, res) => {
             return res.status(400).send("チャットルームを作成するには、まずプロフィールで位置情報（郵便番号）を登録してください。");
         }
         creatorLocationGeoJson = creatorData.locationGeoJson;
+
+        
+        const inputDistance = distance ? parseInt(distance) : 100; 
+        const radiusInMeters = inputDistance * 1000; 
+
+        console.log(`[検索範囲] 半径 ${inputDistance}km (${radiusInMeters}m) でユーザーを検索します。`);
         
         // 2. 周辺ユーザーの検索 (100km 半径)
-        const radiusInMeters = 100000;
+        
         const querySpec = {
             query: "SELECT c.id, c.username, c.email FROM c WHERE ST_DISTANCE(c.locationGeoJson, @creatorLocation) <= @radius AND c.id != @creatorId",
             parameters: [
