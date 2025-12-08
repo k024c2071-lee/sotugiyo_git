@@ -84,6 +84,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const roomRadiusInput = document.getElementById("roomRadius"); // [추가] 슬라이더
     const radiusValueSpan = document.getElementById("radiusValue"); // [추가] 숫자 표시
 
+    //パスワード設定
+    const passwordModal = document.getElementById("passwordModal");
+    const passwordForm = document.getElementById("passwordForm");
+    const inputRoomPassword = document.getElementById("inputRoomPassword");
+    const targetRoomIdInput = document.getElementById("targetRoomId");
+    const closePasswordModalBtn = document.getElementById("closePasswordModal");
+
     
   
     // ==========================
@@ -321,6 +328,64 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   
+
+
+    // --- 🚀 [핵심] 룸 입장 처리 함수 (공개/비공개 분기) ---
+    function handleRoomEntry(room) {
+        // 1. 공개 방이면 바로 입장
+        if (room.isPublic) {
+            window.location.href = `/chat/${room.roomid}`;
+        } else {
+            // 2. 비공개 방이면 패스워드 모달 띄우기
+            targetRoomIdInput.value = room.roomid;
+            inputRoomPassword.value = "";
+            passwordModal.classList.add("active");
+            backdrop.classList.add("active"); // 배경 어둡게
+        }
+    }
+
+    // --- 🚀 [핵심] 패스워드 모달 처리 ---
+    function closePasswordModal() {
+        passwordModal.classList.remove("active");
+        backdrop.classList.remove("active"); // 배경 원복 (단, 룸생성 모달과 겹칠 경우 주의)
+        // 만약 룸 생성 모달이 열려있지 않다면 backdrop 제거
+        if (!modal.classList.contains("active")) {
+            backdrop.classList.remove("active");
+        }
+    }
+
+    if (closePasswordModalBtn) {
+        closePasswordModalBtn.addEventListener("click", closePasswordModal);
+    }
+
+    if (passwordForm) {
+        passwordForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const roomId = targetRoomIdInput.value;
+            const password = inputRoomPassword.value;
+
+            try {
+                const response = await fetch('/api/verify-room-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId, password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    // 패스워드 일치 -> 입장
+                    window.location.href = `/chat/${roomId}`;
+                } else {
+                    alert(result.error || "パスワードが間違っています。");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("エラーが発生しました。");
+            }
+        });
+    }
+
   
     function renderRoomList(rooms) {
       roomListEl.innerHTML = "";
@@ -335,23 +400,11 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="room-item-title">${room.name}</div>
           <div class="room-item-desc">${room.description || ""}</div>
         `;
-        li.addEventListener("click", () => {
-          currentRoomId = room.roomid; // ✅ 現在のルームIDを更新
-          chatRoomName.textContent = room.name;
-          chatBody.innerHTML = `<div class="chat-msg chat-msg-other">${room.name} へようこそ！</div>`;
-
-          showPanelView("chat");
-          sidePanel.classList.add("chat-mode");
-
-          window.location.href = `/chat/${currentRoomId}`;
-
-          // socket.emit('join room', currentRoomId);
-          // socket.emit('request history', currentRoomId);
-        });
+        li.addEventListener("click", () => handleRoomEntry(room));
         roomListEl.appendChild(li);
       });
     }
-    // renderRoomList(DUMMY_ROOMS);
+
 
     async function fetchAndRenderRooms() {
         try {
@@ -533,10 +586,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="room-item-title">${room.name}</div>
                 <div class="room-item-desc">${room.description || ""}</div>
             `;
-            li.addEventListener("click", () => {
-                // 클릭 시 페이지 이동 (리다이렉트)
-                window.location.href = `/chat/${room.roomid}`;
-            });
+            li.addEventListener("click", () => handleRoomEntry(room));
             searchResultList.appendChild(li);
         });
     }
@@ -564,8 +614,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 // 클릭 시 페이지 이동 (리다이렉트)
               window.location.href = `/chat/${room.roomId}`;
             });
+
+            // li.addEventListener("click", () => {
+            //     if (room.isPublic !== undefined) {
+            //         handleRoomEntry(room);
+            //     } else {
+            //         // 정보가 부족하면 그냥 이동 (서버 채팅 페이지에서 튕겨내거나 해야 함)
+            //          window.location.href = `/chat/${room.roomId || room.roomid}`;
+            //     }
+            //     });
+
             roomListE2.appendChild(li);
             })
+
             } catch (err) {
                 console.error(err);
                 roomListE2.innerHTML = '<li class="muted">検索エラーが発生しました。</li>';

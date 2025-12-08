@@ -571,6 +571,52 @@ app.post('/api/create-room', async (req, res) => {
 
 
 
+app.post('/api/verify-room-password', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ error: "ログインが必要です。" });
+    }
+
+    const { roomId, password } = req.body;
+
+    if (!roomId || !password) {
+        return res.status(400).json({ error: "パスワードを入力してください。" });
+    }
+
+    try {
+        // 1. 룸 정보 가져오기
+        const querySpec = {
+            query: "SELECT * FROM c WHERE c.roomid = @roomId",
+            parameters: [{ name: "@roomId", value: roomId }]
+        };
+        const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+
+        if (!rooms || rooms.length === 0) {
+            return res.status(404).json({ error: "ルームが見つかりません。" });
+        }
+
+        const room = rooms[0];
+
+        // 2. 공개 방이면 패스워드 필요 없음 (바로 성공 처리)
+        if (room.isPublic) {
+            return res.json({ success: true });
+        }
+
+        // 3. 비공개 방이면 패스워드 비교 (bcrypt)
+        const isMatch = await bcrypt.compare(password, room.password);
+
+        if (isMatch) {
+            return res.json({ success: true });
+        } else {
+            return res.status(401).json({ error: "パスワードが間違っています。" });
+        }
+
+    } catch (error) {
+        console.error("패스워드 검증 오류:", error);
+        res.status(500).json({ error: "サーバーエラーが発生しました。" });
+    }
+});
+
+
 
 app.get('/api/get-rooms', async (req, res) => {
     if (!req.session.user) {
