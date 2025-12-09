@@ -423,3 +423,18 @@
     }
   }
   
+    .btn-more-container {
+        text-align: center;
+        margin-top: 10px;
+      }
+    .btn-more {
+        background: none;
+        border: 1px solid #ddd;
+        padding: 5px 15px;
+        cursor: pointer;
+        color: #666;
+        border-radius: 4px;
+    }
+    .btn-more:hover {
+        background: #f9f9f9;
+    }

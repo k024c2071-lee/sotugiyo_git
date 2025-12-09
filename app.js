@@ -841,22 +841,28 @@ function generateMyPageHtml(userData) {
       <section class="section-block">
         <div class="section-head">
           <h2>作ったチャットルーム</h2>
-          <a href="#" class="link-sm">すべて見る</a>
         </div>
 
         <div class="card-grid" id="created-rooms-list">
             <p class="muted">読み込み中...</p>
+        </div>
+
+        <div class="btn-more-container">
+            <button id="btn-more-created" class="btn-more" style="display:none;">もっと見る</button>
         </div>
       </section>
 
       <section class="section-block">
         <div class="section-head">
           <h2>最近チャットしたチャットルーム</h2>
-          <a href="#" class="link-sm">履歴をすべて見る</a>
         </div>
 
         <div class="list-block" id="joined-rooms-list">
             <p class="muted">読み込み中...</p>
+        </div>
+
+        <div class="btn-more-container">
+            <button id="btn-more-joined" class="btn-more" style="display:none;">もっと見る</button>
         </div>
       </section>
 
@@ -995,17 +1001,86 @@ function generateMyPageHtml(userData) {
     `;
 }
 
+// // --------------------------------------------------------------------------
+// // 🚀 API: 自分が作ったルーム一覧
+// // --------------------------------------------------------------------------
+// app.get('/api/user/created-rooms', async (req, res) => {
+//     if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
+
+//     try {
+//         // creatorId が自分の ID であるルームを検索
+//         const querySpec = {
+//             query: "SELECT * FROM c WHERE STARTSWITH(c.roomid, 'room_') AND c.creatorId = @userId ORDER BY c.createdAt DESC",
+//             parameters: [{ name: "@userId", value: req.session.user.id }]
+//         };
+//         const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
+//         res.json(rooms);
+//     } catch (error) {
+//         console.error("Created rooms fetch error:", error);
+//         res.status(500).json({ error: 'Error fetching created rooms' });
+//     }
+// });
+
+
+// // --------------------------------------------------------------------------
+// // 🚀 API: 自分が参加（発言）したルーム一覧
+// // --------------------------------------------------------------------------
+// app.get('/api/user/joined-rooms', async (req, res) => {
+//     if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
+
+//     try {
+//         // メッセージ履歴から自分が送信したものを検索 (最新100件)
+//         const querySpec = {
+//             query: "SELECT c.roomId, c.roomName, c.timestamp FROM c WHERE c.sender = @username ORDER BY c.timestamp DESC OFFSET 0 LIMIT 100",
+//             parameters: [{ name: "@username", value: req.session.user.username }]
+//         };
+//         const { resources: messages } = await chatsContainer.items.query(querySpec).fetchAll();
+
+//         // JS側で重複を除去 (roomId基準)
+//         const uniqueRooms = [];
+//         const seenRoomIds = new Set();
+
+//         for (const msg of messages) {
+//             if (!seenRoomIds.has(msg.roomId)) {
+//                 seenRoomIds.add(msg.roomId);
+//                 // 必要なデータだけ抽出
+//                 uniqueRooms.push({
+//                     roomid: msg.roomId,
+//                     name: msg.roomName || '名称未設定', // メッセージにroomNameが含まれている前提
+//                     lastActive: msg.timestamp
+//                 });
+//             }
+//         }
+
+//         res.json(uniqueRooms.slice(0, 10)); // 最新10件のみ返す
+
+//     } catch (error) {
+//         console.error("Joined rooms fetch error:", error);
+//         res.status(500).json({ error: 'Error fetching joined rooms' });
+//     }
+// });
+
+
+
 // --------------------------------------------------------------------------
-// 🚀 API: 自分が作ったルーム一覧
+// 🚀 [수정됨] 마이페이지: 내가 만든 룸 (페이징 지원)
 // --------------------------------------------------------------------------
 app.get('/api/user/created-rooms', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
 
+    // 파라미터 받기 (기본값: limit 5, offset 0)
+    const limit = parseInt(req.query.limit) || 5;
+    const offset = parseInt(req.query.offset) || 0;
+
     try {
-        // creatorId が自分の ID であるルームを検索
+        // OFFSET ... LIMIT 구문 사용
         const querySpec = {
-            query: "SELECT * FROM c WHERE STARTSWITH(c.roomid, 'room_') AND c.creatorId = @userId ORDER BY c.createdAt DESC",
-            parameters: [{ name: "@userId", value: req.session.user.id }]
+            query: `SELECT * FROM c WHERE STARTSWITH(c.roomid, 'room_') AND c.creatorId = @userId ORDER BY c.createdAt DESC OFFSET @offset LIMIT @limit`,
+            parameters: [
+                { name: "@userId", value: req.session.user.id },
+                { name: "@offset", value: offset },
+                { name: "@limit", value: limit }
+            ]
         };
         const { resources: rooms } = await roomsContainer.items.query(querySpec).fetchAll();
         res.json(rooms);
@@ -1015,38 +1090,45 @@ app.get('/api/user/created-rooms', async (req, res) => {
     }
 });
 
-
 // --------------------------------------------------------------------------
-// 🚀 API: 自分が参加（発言）したルーム一覧
+// 🚀 [수정됨] 마이페이지: 참여한 룸 (페이징 지원 - limit)
 // --------------------------------------------------------------------------
 app.get('/api/user/joined-rooms', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
 
+    // 참여한 방은 중복 제거 로직 때문에 정확한 OFFSET 쿼리가 어렵습니다.
+    // 대신 클라이언트가 요청한 limit 만큼의 고유 방을 반환하도록 합니다.
+    const limit = parseInt(req.query.limit) || 5;
+
     try {
-        // メッセージ履歴から自分が送信したものを検索 (最新100件)
+        // 충분한 양의 메시지를 가져와서 JS에서 중복 제거 및 자르기
+        // (참고: 메시지가 아주 많다면 더 효율적인 쿼리 개선 필요)
+        const fetchCount = limit * 10; // 넉넉하게 가져옴
         const querySpec = {
-            query: "SELECT c.roomId, c.roomName, c.timestamp FROM c WHERE c.sender = @username ORDER BY c.timestamp DESC OFFSET 0 LIMIT 100",
-            parameters: [{ name: "@username", value: req.session.user.username }]
+            query: `SELECT c.roomId, c.roomName, c.timestamp FROM c WHERE c.sender = @username ORDER BY c.timestamp DESC OFFSET 0 LIMIT @fetchCount`,
+            parameters: [
+                { name: "@username", value: req.session.user.username },
+                { name: "@fetchCount", value: fetchCount }
+            ]
         };
         const { resources: messages } = await chatsContainer.items.query(querySpec).fetchAll();
 
-        // JS側で重複を除去 (roomId基準)
         const uniqueRooms = [];
         const seenRoomIds = new Set();
 
         for (const msg of messages) {
             if (!seenRoomIds.has(msg.roomId)) {
                 seenRoomIds.add(msg.roomId);
-                // 必要なデータだけ抽出
                 uniqueRooms.push({
                     roomid: msg.roomId,
-                    name: msg.roomName || '名称未設定', // メッセージにroomNameが含まれている前提
+                    name: msg.roomName || '名称未設定',
                     lastActive: msg.timestamp
                 });
             }
+            if (uniqueRooms.length >= limit) break; // 요청한 개수만큼 모이면 중단
         }
 
-        res.json(uniqueRooms.slice(0, 10)); // 最新10件のみ返す
+        res.json(uniqueRooms);
 
     } catch (error) {
         console.error("Joined rooms fetch error:", error);

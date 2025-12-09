@@ -10,6 +10,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const createdRoomsList = document.getElementById("created-rooms-list");
     const joinedRoomsList = document.getElementById("joined-rooms-list");
 
+    const btnMoreCreated = document.getElementById("btn-more-created");
+    const btnMoreJoined = document.getElementById("btn-more-joined");
+
+    // --- Pagination State ---
+    const LIMIT = 6; // 한 번에 불러올 개수
+    let createdOffset = 0;
+    let currentJoinedLimit = 5; // 참여한 방은 offset 대신 limit을 늘려가는 방식
+
     /* --------------------
         データ取得と表示
     -------------------- */
@@ -38,30 +46,119 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-     // 🚀 [추가] 내가 만든 룸 가져오기
-    async function fetchCreatedRooms() {
+    //  // 🚀 [추가] 내가 만든 룸 가져오기
+    // async function fetchCreatedRooms() {
+    //     try {
+    //         const response = await fetch('/api/user/created-rooms');
+    //         if (!response.ok) throw new Error('Created rooms load failed');
+    //         const rooms = await response.json();
+    //         renderCreatedRooms(rooms);
+    //     } catch (error) {
+    //         console.error(error);
+    //         if(createdRoomsList) createdRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
+    //     }
+    // }
+
+    // // 🚀 [추가] 참여한 룸 가져오기
+    // async function fetchJoinedRooms() {
+    //     try {
+    //         const response = await fetch('/api/user/joined-rooms');
+    //         if (!response.ok) throw new Error('Joined rooms load failed');
+    //         const rooms = await response.json();
+    //         renderJoinedRooms(rooms);
+    //     } catch (error) {
+    //         console.error(error);
+    //         if(joinedRoomsList) joinedRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
+    //     }
+    // }
+
+
+     async function fetchCreatedRooms(isAppend = false) {
         try {
-            const response = await fetch('/api/user/created-rooms');
+            // offset과 limit을 파라미터로 전송
+            const response = await fetch(`/api/user/created-rooms?limit=${LIMIT}&offset=${createdOffset}`);
             if (!response.ok) throw new Error('Created rooms load failed');
+            
             const rooms = await response.json();
-            renderCreatedRooms(rooms);
+            
+            if (isAppend) {
+                appendCreatedRooms(rooms);
+            } else {
+                renderCreatedRooms(rooms);
+            }
+
+            // 더 가져올 데이터가 있으면 버튼 표시, 없으면 숨김
+            if (rooms.length < LIMIT) {
+                if(btnMoreCreated) btnMoreCreated.style.display = 'none';
+            } else {
+                if(btnMoreCreated) btnMoreCreated.style.display = 'inline-block';
+            }
+
+            // 오프셋 증가
+            createdOffset += rooms.length;
+
         } catch (error) {
             console.error(error);
-            if(createdRoomsList) createdRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
+            if(!isAppend && createdRoomsList) createdRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
         }
     }
 
-    // 🚀 [추가] 참여한 룸 가져오기
+    // 🚀 [수정됨] 참여한 룸 가져오기
     async function fetchJoinedRooms() {
         try {
-            const response = await fetch('/api/user/joined-rooms');
+            // limit을 늘려서 요청
+            const response = await fetch(`/api/user/joined-rooms?limit=${currentJoinedLimit}`);
             if (!response.ok) throw new Error('Joined rooms load failed');
+            
             const rooms = await response.json();
+            // 참여 룸은 매번 전체(limit 개수만큼)를 다시 그림 (중복 제거 로직 때문)
             renderJoinedRooms(rooms);
+
+            // 받아온 개수가 요청한 limit보다 적으면 더 이상 데이터가 없는 것
+            if (rooms.length < currentJoinedLimit) {
+                if(btnMoreJoined) btnMoreJoined.style.display = 'none';
+            } else {
+                if(btnMoreJoined) btnMoreJoined.style.display = 'inline-block';
+            }
+
         } catch (error) {
             console.error(error);
             if(joinedRoomsList) joinedRoomsList.innerHTML = '<p class="muted">読み込み失敗</p>';
         }
+    }
+
+
+    /* ==========================================================================
+       2. 더 보기 버튼 이벤트
+       ========================================================================== */
+    
+    if (btnMoreCreated) {
+        btnMoreCreated.addEventListener('click', () => {
+            fetchCreatedRooms(true); // true = append mode
+        });
+    }
+
+    if (btnMoreJoined) {
+        btnMoreJoined.addEventListener('click', () => {
+            currentJoinedLimit += LIMIT; // limit을 5개씩 늘림
+            fetchJoinedRooms();
+        });
+    }
+
+
+        function appendCreatedRooms(rooms) {
+        if (!createdRoomsList) return;
+        rooms.forEach(room => {
+            const date = new Date(room.createdAt).toLocaleDateString('ja-JP');
+            const html = `
+                <article class="room-card" onclick="window.location.href='/chat/${room.roomid}'" style="cursor:pointer">
+                    <h3>${room.name}</h3>
+                    <p class="room-meta">作成日: ${date}</p>
+                    <p class="room-desc">${room.description || '説明なし'}</p>
+                </article>
+            `;
+            createdRoomsList.insertAdjacentHTML('beforeend', html);
+        });
     }
 
 
@@ -88,6 +185,8 @@ document.addEventListener("DOMContentLoaded", () => {
             createdRoomsList.insertAdjacentHTML('beforeend', html);
         });
     }
+
+    
 
     // 🚀 [추가] 참여한 룸 렌더링
     function renderJoinedRooms(rooms) {
@@ -264,20 +363,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-    /* --------------------
-        テーマ切替
-    -------------------- */
-    function applyTheme(theme) {
-        const themeName = theme === "ダーク" ? "dark" : "light";
-        
-        if (themeName === "dark") {
-            document.body.classList.add("dark");
-            localStorage.setItem("theme", "dark");
-        } else {
-            document.body.classList.remove("dark");
-            localStorage.setItem("theme", "light");
-        }
-    }
+
 
     // ページ読み込み時：localStorage 의 테마 설정을 fetchUserData 안으로 통합하여 데이터와 함께 처리했습니다.
 });

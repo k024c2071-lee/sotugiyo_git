@@ -13,8 +13,8 @@
   <header class="topbar">
     <div class="logo">CHATRA</div>
     <div class="top-actions">
-      <span class="username" id = "username">ようこそ、Userさん</span>
-      <button class="outline-btn">ログアウト</button>
+      <span class="username" id="username">ようこそ、Userさん</span>
+      <button class="outline-btn" onclick="location.href='/logout'">ログアウト</button>
     </div>
   </header>
 
@@ -37,7 +37,9 @@
 
       <div class="small-card">
         <h3 class="small-title">基本情報</h3>
-        <p id="display-postal">郵便番号：</p>
+        <p>
+            郵便番号：<span id="display-postal"></span>
+        </p>
       </div>
 
     </aside>
@@ -47,28 +49,12 @@
 
       <section class="section-block">
         <div class="section-head">
-          <h2>今参加しているチャットルーム</h2>
+          <h2>作ったチャットルーム</h2>
           <a href="#" class="link-sm">すべて見る</a>
         </div>
 
-        <div class="card-grid">
-          <article class="room-card">
-            <h3>伊香保温泉トーク</h3>
-            <p class="room-meta">参加者 12人 ・ 最終更新 2025/11/10</p>
-            <p class="room-desc">伊香保のおすすめスポット共有ルーム。</p>
-          </article>
-
-          <article class="room-card">
-            <h3>埼玉観光まとめ</h3>
-            <p class="room-meta">参加者 8人 ・ 最終更新 2025/11/08</p>
-            <p class="room-desc">川越・秩父・長瀞の話題中心。</p>
-          </article>
-
-          <article class="room-card">
-            <h3>関東日帰りスポット</h3>
-            <p class="room-meta">参加者 21人 ・ 最終更新 2025/11/07</p>
-            <p class="room-desc">週末のお出かけ候補を雑談。</p>
-          </article>
+        <div class="card-grid" id="created-rooms-list">
+            <p class="muted">読み込み中...</p>
         </div>
       </section>
 
@@ -78,39 +64,8 @@
           <a href="#" class="link-sm">履歴をすべて見る</a>
         </div>
 
-        <div class="list-block">
-          <div class="list-item">
-            <div>
-              <h3>北海道グルメ旅</h3>
-              <p class="room-meta">直近の発言：2分前</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
-          <div class="list-item">
-            <div>
-              <h3>京都・奈良 寺社好き</h3>
-              <p class="room-meta">直近の発言：1時間前</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
-          <div class="list-item">
-            <div>
-              <h3>温泉天国・箱根</h3>
-              <p class="room-meta">直近の発言：昨日</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
-          <div class="list-item">
-            <div>
-              <h3>東北ドライブ計画</h3>
-              <p class="room-meta">直近の発言：3日前</p>
-            </div>
-            <button class="outline-btn sm">開く</button>
-          </div>
-
+        <div class="list-block" id="joined-rooms-list">
+            <p class="muted">読み込み中...</p>
         </div>
       </section>
 
@@ -194,6 +149,55 @@
 
   <!-- JS -->
   <script src="/assets/js/mypage.js"></script>
+
+
+  
+    <script>
+
+
+  async function searchPostalCode() {
+  const postalCodeInput = document.getElementById('postal-code');
+  const address1Input = document.getElementById('address1');
+  const postalCode = postalCodeInput.value;
+
+  if (!postalCode) {
+    alert("郵便番号を入力してください。");
+    return;
+  }
+
+  // zipcloud API URL 생성 (하이픈(-) 제거 필요)
+   const apiUrl = "https://zipcloud.ibsnet.co.jp/api/search?zipcode=" + postalCode.replace(/-/g, '');
+
+  try {
+    // fetch API를 사용해 zipcloud 서버에 GET 요청
+    const response = await fetch(apiUrl);
+    const data = await response.json(); // 응답을 JSON 형태로 파싱
+
+    // API 응답 상태 확인
+    if (data.status === 200 && data.results) {
+      // 성공적으로 주소를 찾았을 경우
+      const result = data.results[0];
+      // 주소 조합 (都道府県 + 市区町村 + 町域名)
+      const fullAddress = result.address1 + result.address2 + result.address3;
+      address1Input.value = fullAddress; // address1 필드에 자동 입력
+    } else if (data.status === 400 || data.status === 500) {
+      // 우편번호 형식이 잘못되었거나, 해당 주소가 없을 경우
+       alert("住所が見つかりませんでした: " + data.message);
+      address1Input.value = ''; // 필드 비우기
+    } else {
+      alert("予期せぬエラーが発生しました。");
+      address1Input.value = '';
+    }
+  } catch (error) {
+    console.error("郵便番号APIの呼び出し中にエラーが発生しました:", error);
+    alert("住所の検索中にネットワークエラーが発生しました。");
+    address1Input.value = '';
+  }
+}
+
+
+    </script>
+  
 
 </body>
 </html>

@@ -435,11 +435,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const roomToOpen = rooms.find(r => r.roomid === roomIdFromUrl); 
 
             if (roomToOpen) {
-                // ----------------------------------------------------
-                // ✅ 찾았다면, 리스트의 'click' 이벤트와 동일한 작업을 수행
-                // ----------------------------------------------------
+                 // URL로 직접 들어올 때도 소켓 연결 등 처리
                 currentRoomId = roomToOpen.roomid; // 현재 룸 ID 설정
-                chatRoomName.textContent = roomToOpen.name;
+                chatRoomName.innerHTML = `
+                        <span>${roomToOpen.name}</span>
+                        <span style="font-size:0.85em; font-weight:normal; margin-left:10px; opacity:0.8;">
+                            ${roomToOpen.description || ''}
+                        </span>
+                    `;
                 chatBody.innerHTML = `<div class="chat-msg chat-msg-other">${roomToOpen.name} へようこそ！</div>`;
                 
                 openSidePanel(); // 사이드 패널 열기
