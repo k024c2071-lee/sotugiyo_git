@@ -802,7 +802,7 @@ function generateMyPageHtml(userData) {
 
   <!-- ヘッダー -->
   <header class="topbar">
-    <div class="logo">CHATRA</div>
+    <div class="logo" onclick="location.href='/pages/map.html'">CHATRA</div>
     <div class="top-actions">
       <span class="username" id="username">ようこそ、Userさん</span>
       <button class="outline-btn" onclick="location.href='/logout'">ログアウト</button>
